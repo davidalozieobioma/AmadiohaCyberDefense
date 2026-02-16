@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  amadioha:
+    build: .
+    container_name: amadioha-cyber-defense
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_APP=amadioha.web:app
+    volumes:
+      - .:/app
+      - /app/__pycache__
+    command: flask run --host=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - amadioha-network
+
+networks:
+  amadioha-network:
+    driver: bridge
