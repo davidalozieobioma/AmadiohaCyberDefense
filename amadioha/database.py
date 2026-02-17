@@ -245,6 +245,61 @@ def init_db():
         )
     """)
 
+    # Credit plans for pay-per-scan billing
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS credit_plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            credits INTEGER NOT NULL,
+            price_cents INTEGER NOT NULL,
+            currency TEXT DEFAULT 'usd',
+            active BOOLEAN DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # User credit balances
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_credits (
+            user_id INTEGER PRIMARY KEY,
+            balance INTEGER DEFAULT 0,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+
+    # Payment records
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            amount_cents INTEGER NOT NULL,
+            currency TEXT NOT NULL,
+            credits INTEGER NOT NULL,
+            provider TEXT DEFAULT 'stripe',
+            provider_ref TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+
+    # Seed default credit plans if none exist
+    cursor.execute("SELECT COUNT(*) FROM credit_plans")
+    if cursor.fetchone()[0] == 0:
+        cursor.executemany(
+            """
+            INSERT INTO credit_plans (name, credits, price_cents, currency, active)
+            VALUES (?, ?, ?, ?, 1)
+            """,
+            [
+                ("Starter", 10, 500, "usd"),
+                ("Team", 50, 2000, "usd"),
+                ("Business", 200, 7000, "usd")
+            ]
+        )
+
     # System logs table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS system_logs (
@@ -1333,6 +1388,277 @@ def update_setting(key: str, value) -> bool:
     """Update a system setting. Currently a placeholder."""
     # In future, implement settings persistence
     return True
+
+
+# ============================================================================
+# BILLING & CREDITS
+# ============================================================================
+
+def get_credit_plans(active_only: bool = True) -> List[Dict]:
+    """Return available credit plans."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    if active_only:
+        cursor.execute(
+            """
+            SELECT id, name, credits, price_cents, currency, active, created_at
+            FROM credit_plans
+            WHERE active = 1
+            ORDER BY credits ASC
+            """
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT id, name, credits, price_cents, currency, active, created_at
+            FROM credit_plans
+            ORDER BY credits ASC
+            """
+        )
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def get_credit_plan(plan_id: int) -> Optional[Dict]:
+    """Get a credit plan by ID."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id, name, credits, price_cents, currency, active, created_at
+        FROM credit_plans
+        WHERE id = ?
+        """,
+        (plan_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_or_create_user_credits(user_id: int) -> Dict:
+    """Get user credit balance or create a zero-balance record."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT user_id, balance, updated_at
+        FROM user_credits
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+    row = cursor.fetchone()
+
+    if not row:
+        cursor.execute(
+            """
+            INSERT INTO user_credits (user_id, balance)
+            VALUES (?, 0)
+            """,
+            (user_id,)
+        )
+        conn.commit()
+        cursor.execute(
+            """
+            SELECT user_id, balance, updated_at
+            FROM user_credits
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        )
+        row = cursor.fetchone()
+
+    conn.close()
+    return dict(row)
+
+
+def get_user_credits(user_id: int) -> int:
+    """Return current credit balance for a user."""
+    record = get_or_create_user_credits(user_id)
+    return int(record.get("balance", 0))
+
+
+def add_user_credits(user_id: int, credits: int) -> int:
+    """Add credits to a user and return the new balance."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO user_credits (user_id, balance)
+        VALUES (?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            balance = balance + ?,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (user_id, credits, credits)
+    )
+    conn.commit()
+
+    cursor.execute(
+        """
+        SELECT balance FROM user_credits WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+    balance = cursor.fetchone()[0]
+    conn.close()
+    return int(balance)
+
+
+def deduct_user_credits(user_id: int, credits: int) -> bool:
+    """Deduct credits from a user if sufficient balance exists."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT balance FROM user_credits WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+    row = cursor.fetchone()
+    balance = int(row[0]) if row else 0
+
+    if balance < credits:
+        conn.close()
+        return False
+
+    cursor.execute(
+        """
+        UPDATE user_credits
+        SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+        """,
+        (credits, user_id)
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def create_payment_record(user_id: int, amount_cents: int, currency: str,
+                          credits: int, provider: str = "stripe",
+                          provider_ref: str = None,
+                          status: str = "pending") -> int:
+    """Create a payment record and return its ID."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO payments (user_id, amount_cents, currency, credits, provider,
+                              provider_ref, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (user_id, amount_cents, currency, credits, provider, provider_ref, status)
+    )
+    conn.commit()
+    payment_id = cursor.lastrowid
+    conn.close()
+    return payment_id
+
+
+def update_payment_record(payment_id: int, status: str,
+                          provider_ref: str = None) -> bool:
+    """Update payment status and provider reference."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE payments
+        SET status = ?, provider_ref = COALESCE(?, provider_ref),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (status, provider_ref, payment_id)
+    )
+    conn.commit()
+    updated = cursor.rowcount > 0
+    conn.close()
+    return updated
+
+
+def get_payment_by_id(payment_id: int) -> Optional[Dict]:
+    """Get a payment by ID."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id, user_id, amount_cents, currency, credits, provider, provider_ref,
+               status, created_at, updated_at
+        FROM payments
+        WHERE id = ?
+        """,
+        (payment_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_earnings_summary() -> Dict:
+    """Return total revenue and credits sold for paid transactions."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT
+            COALESCE(SUM(amount_cents), 0) AS total_revenue_cents,
+            COALESCE(SUM(credits), 0) AS total_credits_sold,
+            COUNT(*) AS total_transactions
+        FROM payments
+        WHERE status = 'paid'
+        """
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return {
+        "total_revenue_cents": int(row[0]),
+        "total_credits_sold": int(row[1]),
+        "total_transactions": int(row[2])
+    }
+
+
+def get_recent_payments(limit: int = 20) -> List[Dict]:
+    """Return recent payments with user info."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT p.id, p.user_id, u.username, p.amount_cents, p.currency, p.credits,
+               p.provider, p.provider_ref, p.status, p.created_at, p.updated_at
+        FROM payments p
+        LEFT JOIN users u ON u.id = p.user_id
+        ORDER BY p.created_at DESC
+        LIMIT ?
+        """,
+        (limit,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
 
 
 if __name__ == "__main__":

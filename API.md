@@ -22,12 +22,12 @@ The Amadioha Cyber Defense API provides a comprehensive suite of endpoints for n
 8. [Alerts & Notifications](#alerts--notifications)
 9. [Webhooks](#webhooks)
 10. [Scheduled Scans](#scheduled-scans)
-11. [Analytics](#analytics)
-12. [Admin Operations](#admin-operations)
+11. [Billing & Credits](#billing--credits)
+12. [Analytics](#analytics)
+13. [Admin Operations](#admin-operations)
 
 ---
 
-## Authentication
 
 ### Register User
 **POST** `/api/auth/register`
@@ -52,7 +52,6 @@ Register a new user account.
 ```
 
 ---
-
 ### Login
 **POST** `/api/auth/login`
 
@@ -66,7 +65,6 @@ Authenticate and create session.
 }
 ```
 
-**Response:** `200 OK`
 ```json
 {
   "message": "Login successful",
@@ -87,14 +85,12 @@ Authenticate and create session.
 End current session.
 
 **Response:** `200 OK`
-```json
 {
   "message": "Logged out successfully"
 }
 ```
 
 ---
-
 ### Get Current User
 **GET** `/api/auth/me`
 
@@ -648,6 +644,37 @@ Get comprehensive system statistics.
   "total_threats": 89,
   "active_sessions": 5,
   "database_size_mb": 128.5
+}
+```
+
+---
+
+### Get Earnings Summary
+**GET** `/api/admin/earnings`
+
+Get revenue, credits sold, and recent payments.
+
+**Response:** `200 OK`
+```json
+{
+  "summary": {
+    "total_revenue_cents": 5000,
+    "total_credits_sold": 100,
+    "total_transactions": 4
+  },
+  "payments": [
+    {
+      "id": 12,
+      "user_id": 3,
+      "username": "alice",
+      "amount_cents": 500,
+      "currency": "usd",
+      "credits": 10,
+      "status": "paid",
+      "created_at": "2026-02-17T10:30:00Z"
+    }
+  ],
+  "currency": "usd"
 }
 ```
 

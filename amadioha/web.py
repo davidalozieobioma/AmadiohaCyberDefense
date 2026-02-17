@@ -9,6 +9,10 @@ from pathlib import Path
 import io
 import os
 import secrets
+try:
+    import stripe
+except ImportError:
+    stripe = None
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = os.environ.get("AMADIOHA_SECRET_KEY", secrets.token_hex(32))
@@ -18,6 +22,14 @@ app.config.update(
     SESSION_COOKIE_SECURE=False,
     SESSION_COOKIE_PATH='/'
 )
+
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_CURRENCY = os.environ.get("STRIPE_CURRENCY", "usd")
+APP_BASE_URL = os.environ.get("AMADIOHA_APP_URL", "").rstrip("/")
+
+if stripe and STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
 
 # Initialize database
 database.init_db()
@@ -52,13 +64,21 @@ def is_admin(user: dict) -> bool:
     return bool(user) and user.get('role') == 'admin'
 
 
+def get_base_url() -> str:
+    """Resolve base URL for redirects and external integrations."""
+    if APP_BASE_URL:
+        return APP_BASE_URL
+    return request.host_url.rstrip("/")
+
+
 @app.before_request
 def enforce_authentication():
     """Require authentication for dashboard and all API routes."""
     public_paths = {
         '/login', '/register',
         '/api/auth/login', '/api/auth/register',
-        '/health'
+        '/health',
+        '/api/billing/webhook'
     }
 
     if request.method == 'OPTIONS':
@@ -145,6 +165,17 @@ def logout():
 def api_scan():
     """API endpoint for network scanning."""
     try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({"error": "Unauthorized"}), 401
+        if not is_admin(current_user):
+            if not database.deduct_user_credits(current_user.get('id'), 1):
+                balance = database.get_user_credits(current_user.get('id'))
+                return jsonify({
+                    "error": "Insufficient credits",
+                    "balance": balance
+                }), 402
+
         data = request.json
         target = data.get('target', '127.0.0.1')
         start = int(data.get('start', 1))
@@ -179,6 +210,9 @@ def api_scan():
             "profile": profile,
             "open_ports": sorted(open_ports),
             "enriched_ports": enriched_ports,
+            "credits_used": 0 if is_admin(current_user) else 1,
+            "credits_remaining": database.get_user_credits(current_user.get('id'))
+            if not is_admin(current_user) else None,
             "timestamp": datetime.now().isoformat(),
             "status": "completed"
         }
@@ -720,6 +754,124 @@ def api_auth_me():
     })
 
 
+# ===== BILLING & CREDITS =====
+
+@app.route('/api/billing/credits/plans', methods=['GET'])
+def api_credit_plans():
+    """Return active credit plans."""
+    plans = database.get_credit_plans(active_only=True)
+    return jsonify({"plans": plans})
+
+
+@app.route('/api/billing/credits/balance', methods=['GET'])
+def api_credit_balance():
+    """Return current user's credit balance."""
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    balance = database.get_user_credits(user.get('id'))
+    return jsonify({"balance": balance})
+
+
+@app.route('/api/billing/credits/checkout', methods=['POST'])
+def api_credit_checkout():
+    """Create a Stripe Checkout session for credit purchase."""
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    if not stripe or not STRIPE_SECRET_KEY:
+        return jsonify({"error": "Stripe not configured"}), 500
+
+    data = request.json or {}
+    try:
+        plan_id = int(data.get('plan_id', 0))
+    except ValueError:
+        plan_id = 0
+
+    plan = database.get_credit_plan(plan_id)
+    if not plan or not plan.get('active'):
+        return jsonify({"error": "Plan not found"}), 404
+
+    payment_id = database.create_payment_record(
+        user_id=user.get('id'),
+        amount_cents=plan.get('price_cents'),
+        currency=plan.get('currency') or STRIPE_CURRENCY,
+        credits=plan.get('credits'),
+        provider='stripe',
+        status='pending'
+    )
+
+    base_url = get_base_url()
+    success_url = f"{base_url}/?purchase=success"
+    cancel_url = f"{base_url}/?purchase=cancel"
+
+    session_obj = stripe.checkout.Session.create(
+        mode="payment",
+        payment_method_types=["card"],
+        line_items=[
+            {
+                "price_data": {
+                    "currency": plan.get('currency') or STRIPE_CURRENCY,
+                    "product_data": {
+                        "name": plan.get('name'),
+                        "description": f"{plan.get('credits')} scan credits"
+                    },
+                    "unit_amount": plan.get('price_cents')
+                },
+                "quantity": 1
+            }
+        ],
+        metadata={
+            "user_id": str(user.get('id')),
+            "credits": str(plan.get('credits')),
+            "payment_id": str(payment_id)
+        },
+        success_url=success_url,
+        cancel_url=cancel_url
+    )
+
+    database.update_payment_record(payment_id, "pending", provider_ref=session_obj.id)
+    return jsonify({"checkout_url": session_obj.url})
+
+
+@app.route('/api/billing/webhook', methods=['POST'])
+def api_billing_webhook():
+    """Stripe webhook handler for completed payments."""
+    if not stripe or not STRIPE_WEBHOOK_SECRET:
+        return jsonify({"error": "Webhook not configured"}), 400
+
+    payload = request.data
+    sig_header = request.headers.get('Stripe-Signature')
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, STRIPE_WEBHOOK_SECRET
+        )
+    except (ValueError, stripe.error.SignatureVerificationError):
+        return jsonify({"error": "Invalid webhook"}), 400
+
+    if event.get('type') == 'checkout.session.completed':
+        session_obj = event.get('data', {}).get('object', {})
+        metadata = session_obj.get('metadata', {})
+        try:
+            payment_id = int(metadata.get('payment_id', 0))
+            user_id = int(metadata.get('user_id', 0))
+            credits = int(metadata.get('credits', 0))
+        except ValueError:
+            payment_id = 0
+            user_id = 0
+            credits = 0
+
+        payment = database.get_payment_by_id(payment_id)
+        if payment and payment.get('status') != 'paid':
+            database.update_payment_record(payment_id, 'paid', session_obj.get('id'))
+            if user_id and credits:
+                database.add_user_credits(user_id, credits)
+
+    return jsonify({"status": "ok"})
+
+
 # ===== ANALYTICS ENDPOINTS =====
 
 @app.route('/api/analytics/summary', methods=['GET'])
@@ -1014,6 +1166,26 @@ def api_admin_stats():
             "total_scans": scan_count,
             "total_analyses": analysis_count,
             "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/earnings', methods=['GET'])
+def api_admin_earnings():
+    """Get earnings summary and recent payments (admin only)."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        summary = database.get_earnings_summary()
+        payments = database.get_recent_payments(limit=20)
+        return jsonify({
+            "status": "success",
+            "summary": summary,
+            "payments": payments,
+            "currency": STRIPE_CURRENCY
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 400

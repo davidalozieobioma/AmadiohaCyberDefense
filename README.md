@@ -199,6 +199,34 @@ POST /api/analyze
 POST /api/intel
   { "ip": "185.220.101.1" }
 
+---
+
+## Stripe Credits Setup
+
+The admin portal includes a test purchase flow for pay-per-scan credits. To enable live checkout:
+
+1. Create a Stripe account and get API keys.
+2. Set environment variables (example):
+
+```bash
+set STRIPE_SECRET_KEY=sk_live_...
+set STRIPE_WEBHOOK_SECRET=whsec_...
+set STRIPE_CURRENCY=usd
+set AMADIOHA_APP_URL=https://your-domain.com
+```
+
+3. Configure a Stripe webhook to call:
+
+```
+POST https://your-domain.com/api/billing/webhook
+```
+
+4. Start the app and open the Admin portal -> Earnings tab -> Start Checkout.
+
+Notes:
+- For local testing, you can use Stripe's test keys and the Stripe CLI to forward webhooks.
+- Credit plans are seeded automatically on first run (Starter, Team, Business).
+
 # Get all results
 GET /api/results
 ```

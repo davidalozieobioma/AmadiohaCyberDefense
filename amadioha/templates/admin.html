@@ -177,6 +177,7 @@
         <hr style="border-color: #667eea; margin: 10px 0;">
         <a href="#" class="nav-link" data-tab="api-keys">🔑 API Keys</a>
         <a href="#" class="nav-link" data-tab="usage">📊 Usage & Limits</a>
+        <a href="#" class="nav-link" data-tab="earnings">$ Earnings</a>
         <a href="#" class="nav-link" data-tab="alerts">🚨 Security Alerts</a>
         
         <!-- System -->
@@ -533,6 +534,81 @@
             </div>
         </div>
 
+        <!-- Earnings Tab -->
+        <div id="earnings" class="tab-content">
+            <h3 style="margin-bottom: 20px;">Earnings</h3>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="stat-box">
+                        <i class="fas fa-dollar-sign" style="font-size: 2em;"></i>
+                        <h3 id="earnings-total">$0.00</h3>
+                        <p>Total Revenue</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-box">
+                        <i class="fas fa-ticket-alt" style="font-size: 2em;"></i>
+                        <h3 id="earnings-credits">0</h3>
+                        <p>Credits Sold</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-box">
+                        <i class="fas fa-receipt" style="font-size: 2em;"></i>
+                        <h3 id="earnings-transactions">0</h3>
+                        <p>Transactions</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Buy Credits (Test Purchase)</div>
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-6">
+                            <label class="form-label">Credit Plan</label>
+                            <select class="form-select" id="credit-plan-select">
+                                <option value="">Loading plans...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-primary w-100" onclick="startCreditPurchase()">
+                                Start Checkout
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <small class="text-muted">Redirects to Stripe Checkout</small>
+                        </div>
+                    </div>
+                    <div class="mt-2" id="credit-purchase-status"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Recent Payments</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Payment ID</th>
+                                    <th>User</th>
+                                    <th>Amount</th>
+                                    <th>Credits</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody id="earnings-table">
+                                <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Security Alerts Tab -->
         <div id="alerts" class="tab-content">
             <h3 style="margin-bottom: 20px;">Security Alerts Configuration</h3>
@@ -658,6 +734,7 @@
             if (tabName === 'ip-access') loadIPAccess();
             if (tabName === 'api-keys') loadAPIKeys();
             if (tabName === 'usage') loadUsage();
+            if (tabName === 'earnings') loadEarnings();
             if (tabName === 'alerts') loadAlerts();
             if (tabName === 'logs') loadSystemLogs();
             if (tabName === 'departments') loadDepartments();
@@ -787,6 +864,99 @@
                 const data = await response.json();
                 let html = '';
                 document.getElementById('usage-table').innerHTML = html || '<tr><td colspan="6" class="text-center">Usage data</td></tr>';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function formatMoney(cents, currency) {
+            const amount = (Number(cents) || 0) / 100;
+            const code = (currency || 'usd').toUpperCase();
+            try {
+                return new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: code
+                }).format(amount);
+            } catch (error) {
+                return `$${amount.toFixed(2)}`;
+            }
+        }
+
+        async function loadCreditPlans() {
+            try {
+                const response = await fetch('/api/billing/credits/plans');
+                const data = await response.json();
+                const select = document.getElementById('credit-plan-select');
+                const plans = data.plans || [];
+                let html = '';
+
+                plans.forEach(plan => {
+                    const price = formatMoney(plan.price_cents, plan.currency);
+                    html += `<option value="${plan.id}">${plan.name} - ${plan.credits} credits (${price})</option>`;
+                });
+
+                select.innerHTML = html || '<option value="">No plans available</option>';
+            } catch (error) {
+                const select = document.getElementById('credit-plan-select');
+                select.innerHTML = '<option value="">Failed to load plans</option>';
+            }
+        }
+
+        async function startCreditPurchase() {
+            const planId = document.getElementById('credit-plan-select').value;
+            if (!planId) {
+                showAlert('Select a credit plan first', 'danger');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/billing/credits/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plan_id: Number(planId) })
+                });
+                const data = await response.json();
+                if (response.ok && data.checkout_url) {
+                    window.location.href = data.checkout_url;
+                    return;
+                }
+                showAlert(data.error || 'Unable to start checkout', 'danger');
+            } catch (error) {
+                showAlert('Unable to start checkout', 'danger');
+            }
+        }
+
+        async function loadEarnings() {
+            try {
+                const response = await fetch(`${API_BASE}/earnings`);
+                const data = await response.json();
+                const summary = data.summary || {};
+                const currency = data.currency || 'usd';
+
+                document.getElementById('earnings-total').textContent =
+                    formatMoney(summary.total_revenue_cents, currency);
+                document.getElementById('earnings-credits').textContent =
+                    summary.total_credits_sold || 0;
+                document.getElementById('earnings-transactions').textContent =
+                    summary.total_transactions || 0;
+
+                let html = '';
+                (data.payments || []).forEach(payment => {
+                    const amount = formatMoney(payment.amount_cents, payment.currency || currency);
+                    html += `<tr>
+                        <td>${payment.id}</td>
+                        <td>${payment.username || payment.user_id}</td>
+                        <td>${amount}</td>
+                        <td>${payment.credits}</td>
+                        <td>${payment.status}</td>
+                        <td>${new Date(payment.created_at).toLocaleString()}</td>
+                    </tr>`;
+                });
+
+                document.getElementById('earnings-table').innerHTML =
+                    html || '<tr><td colspan="6" class="text-center">No payments yet</td></tr>';
+
+                loadCreditPlans();
             } catch (error) {
                 console.error('Error:', error);
             }
