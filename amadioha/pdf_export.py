@@ -2,14 +2,16 @@
 
 from datetime import datetime
 from typing import Dict, List
-import json
 
 
-def generate_html_report(scan_data: Dict, analysis_data: Dict = None, website_scans: List[Dict] = None) -> str:
+def generate_html_report(
+        scan_data: Dict,
+        analysis_data: Dict = None,
+        website_scans: List[Dict] = None) -> str:
     """Generate a comprehensive HTML report that can be printed to PDF."""
-    
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -154,7 +156,7 @@ def generate_html_report(scan_data: Dict, analysis_data: Dict = None, website_sc
                 <p class="timestamp">Generated: {timestamp}</p>
             </header>
     """
-    
+
     # Network Scan Summary
     if scan_data:
         html += f"""
@@ -164,31 +166,43 @@ def generate_html_report(scan_data: Dict, analysis_data: Dict = None, website_sc
             <p>Profile: <strong>{scan_data.get('profile', 'N/A')}</strong></p>
             <p>Scan Range: <strong>{scan_data.get('port_range', {}).get('start', '?')}-{scan_data.get('port_range', {}).get('end', '?')}</strong></p>
         </div>
-        
+
         <h3>Open Ports Detected</h3>
         <div class="port-list">
         """
-        
+
         open_ports = scan_data.get('results', {}).get('open_ports', [])
         if open_ports:
             for port in open_ports:
                 html += f'<div class="port-item">Port {port}</div>'
         else:
             html += '<p>No open ports detected</p>'
-        
+
         html += """
         </div>
-        
+
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
         """
-        
+
         results = scan_data.get('results', {})
-        html += f'<div class="metric"><div class="metric-label">Ports Scanned</div><div class="metric-value">{results.get("total_ports_scanned", 0)}</div></div>'
-        html += f'<div class="metric"><div class="metric-label">Open Ports</div><div class="metric-value">{results.get("total_open", 0)}</div></div>'
-        html += f'<div class="metric"><div class="metric-label">Closed Ports</div><div class="metric-value">{results.get("total_ports_scanned", 0) - results.get("total_open", 0)}</div></div>'
-        
+        html += f'<div class="metric"><div class="metric-label">Ports Scanned</div><div class="metric-value">{
+            results.get(
+                "total_ports_scanned",
+                0)}</div></div>'
+        html += f'<div class="metric"><div class="metric-label">Open Ports</div><div class="metric-value">{
+            results.get(
+                "total_open",
+                0)}</div></div>'
+        html += f'<div class="metric"><div class="metric-label">Closed Ports</div><div class="metric-value">{
+            results.get(
+                "total_ports_scanned",
+                0) -
+            results.get(
+                "total_open",
+                0)}</div></div>'
+
         html += """</div>"""
-    
+
     # Analysis Summary
     if analysis_data:
         html += f"""
@@ -198,7 +212,7 @@ def generate_html_report(scan_data: Dict, analysis_data: Dict = None, website_sc
             <h3>Log File: {analysis_data.get('log_file', 'N/A')}</h3>
             <p>Total IPs Analyzed: <strong>{analysis_data.get('total_ips', 0)}</strong></p>
         </div>
-        
+
         <h3>Threats Detected</h3>
         <table>
             <tr>
@@ -208,7 +222,7 @@ def generate_html_report(scan_data: Dict, analysis_data: Dict = None, website_sc
                 <th>Details</th>
             </tr>
         """
-        
+
         threats = analysis_data.get('threats', [])
         if threats:
             for threat in threats:
@@ -224,16 +238,16 @@ def generate_html_report(scan_data: Dict, analysis_data: Dict = None, website_sc
                 """
         else:
             html += '<tr><td colspan="4">No threats detected</td></tr>'
-        
+
         html += """</table>"""
-    
+
     # Website Security Summary
     if website_scans:
         html += f"""
         <div class="page-break"></div>
         <h2>Website Security Analysis</h2>
         <p>Analyzed {len(website_scans)} website(s) for security and legitimacy.</p>
-        
+
         <table>
             <tr>
                 <th>URL</th>
@@ -243,7 +257,7 @@ def generate_html_report(scan_data: Dict, analysis_data: Dict = None, website_sc
                 <th>Threats</th>
             </tr>
         """
-        
+
         for scan in website_scans:
             score = scan.get('legitimacy_score', 0)
             if score >= 80:
@@ -252,10 +266,10 @@ def generate_html_report(scan_data: Dict, analysis_data: Dict = None, website_sc
                 status = '⚠ Suspicious'
             else:
                 status = '✗ Dangerous'
-            
+
             ssl_status = '✓ Valid' if scan.get('ssl_valid') else '✗ Invalid'
             threat_count = len(scan.get('phishing_patterns', []))
-            
+
             html += f"""
             <tr>
                 <td>{scan.get('url', 'N/A')}</td>
@@ -265,9 +279,9 @@ def generate_html_report(scan_data: Dict, analysis_data: Dict = None, website_sc
                 <td>{threat_count}</td>
             </tr>
             """
-        
+
         html += """</table>"""
-    
+
     # Footer
     html += """
         <div class="footer">
@@ -278,7 +292,7 @@ def generate_html_report(scan_data: Dict, analysis_data: Dict = None, website_sc
     </body>
     </html>
     """
-    
+
     return html
 
 
@@ -291,7 +305,7 @@ def generate_pdf_from_html(html_content: str, filename: str = None) -> bytes:
     try:
         from weasyprint import HTML
         import io
-        
+
         pdf_bytes = HTML(string=html_content).write_pdf()
         return pdf_bytes
     except ImportError:
@@ -305,12 +319,12 @@ def export_report_to_pdf(scan_data: Dict = None, analysis_data: Dict = None,
     try:
         # Generate HTML
         html = generate_html_report(scan_data, analysis_data, website_scans)
-        
+
         # Try to convert to PDF
         pdf_content = generate_pdf_from_html(html)
-        
+
         filename = f"SecurityReport_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        
+
         return {
             "success": True,
             "filename": filename,
@@ -337,7 +351,7 @@ if __name__ == "__main__":
             "open_ports": [22, 80, 443]
         }
     }
-    
+
     html = generate_html_report(test_scan)
     print("HTML Report generated successfully")
     print(f"Length: {len(html)} characters")

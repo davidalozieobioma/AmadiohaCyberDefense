@@ -6,6 +6,7 @@ from rich.console import Console
 
 console = Console()
 
+
 def scan_port(target: str, port: int, timeout: float) -> Optional[int]:
     try:
         conn = socket.create_connection((target, port), timeout=timeout)
@@ -14,8 +15,15 @@ def scan_port(target: str, port: int, timeout: float) -> Optional[int]:
     except Exception:
         return None
 
-def scan_range_concurrent(target: str, start: int, end: int, timeout: float, workers: int) -> List[int]:
-    console.print(f"[bold cyan]Scanning {target} ports {start}-{end} with {workers} workers...[/bold cyan]")
+
+def scan_range_concurrent(
+        target: str,
+        start: int,
+        end: int,
+        timeout: float,
+        workers: int) -> List[int]:
+    console.print(
+        f"[bold cyan]Scanning {target} ports {start}-{end} with {workers} workers...[/bold cyan]")
     ports = range(start, end + 1)
     open_ports: List[int] = []
     with ThreadPoolExecutor(max_workers=workers) as ex:
@@ -30,14 +38,24 @@ def scan_range_concurrent(target: str, start: int, end: int, timeout: float, wor
                 open_ports.append(res)
     return sorted(open_ports)
 
+
 def main():
     parser = argparse.ArgumentParser(description="Concurrent network port scanner")
     parser.add_argument("--target", default="127.0.0.1", help="Target IP or hostname")
     parser.add_argument("--start", type=int, default=1, help="Start port")
     parser.add_argument("--end", type=int, default=1024, help="End port")
-    parser.add_argument("--profile", choices=["fast", "balanced", "safe"], default="balanced", help="Preconfigured scan profile")
-    parser.add_argument("--workers", type=int, default=None, help="Number of threads (overrides profile)")
-    parser.add_argument("--timeout", type=float, default=None, help="Connection timeout seconds (overrides profile)")
+    parser.add_argument(
+        "--profile",
+        choices=[
+            "fast",
+            "balanced",
+            "safe"],
+        default="balanced",
+        help="Preconfigured scan profile")
+    parser.add_argument("--workers", type=int, default=None,
+                        help="Number of threads (overrides profile)")
+    parser.add_argument("--timeout", type=float, default=None,
+                        help="Connection timeout seconds (overrides profile)")
     parser.add_argument("--out", help="Write open ports to file")
     args = parser.parse_args()
 
@@ -60,6 +78,7 @@ def main():
             console.print(f"Wrote {len(open_ports)} open ports to {args.out}")
         except Exception as e:
             console.print(f"[red]Failed to write output file: {e}[/red]")
+
 
 if __name__ == "__main__":
     main()

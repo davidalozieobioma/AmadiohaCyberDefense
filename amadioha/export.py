@@ -31,9 +31,9 @@ def export_scan_to_csv(scan: Dict) -> str:
     """Export a network scan result to CSV format."""
     output = StringIO()
     writer = csv.writer(output)
-    
+
     writer.writerow(["Timestamp", "Target", "Port", "Service", "Status"])
-    
+
     for port in scan.get("open_ports", []):
         writer.writerow([
             scan.get("timestamp", datetime.now().isoformat()),
@@ -42,7 +42,7 @@ def export_scan_to_csv(scan: Dict) -> str:
             "Service",  # Can be enhanced with port_services mapping
             "Open"
         ])
-    
+
     return output.getvalue()
 
 
@@ -64,9 +64,10 @@ def export_analysis_to_csv(analysis: Dict) -> str:
     """Export a log analysis result to CSV format."""
     output = StringIO()
     writer = csv.writer(output)
-    
-    writer.writerow(["IP Address", "Attempts", "Reputation Score", "Threat Type", "Known for Attacks"])
-    
+
+    writer.writerow(["IP Address", "Attempts", "Reputation Score",
+                    "Threat Type", "Known for Attacks"])
+
     for threat in analysis.get("threats", []):
         writer.writerow([
             threat.get("ip"),
@@ -75,7 +76,7 @@ def export_analysis_to_csv(analysis: Dict) -> str:
             threat.get("threat_type"),
             threat.get("known_for_attacks", False)
         ])
-    
+
     return output.getvalue()
 
 
@@ -94,11 +95,11 @@ def export_threat_intel_to_csv(ip: str, intel_data: Dict) -> str:
     """Export threat intelligence data to CSV format."""
     output = StringIO()
     writer = csv.writer(output)
-    
+
     writer.writerow(["Attribute", "Value"])
     for key, value in intel_data.items():
         writer.writerow([key, value])
-    
+
     return output.getvalue()
 
 
@@ -151,7 +152,7 @@ def generate_html_report(scan: Optional[Dict] = None, analysis: Optional[Dict] =
             <h1>🛡️ Amadioha Cyber Defense Report</h1>
             <p class="timestamp">Generated: """ + datetime.now().isoformat() + """</p>
     """
-    
+
     if scan:
         html += f"""
             <h2>Network Scan Results</h2>
@@ -171,7 +172,7 @@ def generate_html_report(scan: Optional[Dict] = None, analysis: Optional[Dict] =
         for port in scan.get("open_ports", []):
             html += f"<tr><td>{port}</td><td>Open</td></tr>"
         html += "</table>"
-    
+
     if analysis:
         html += f"""
             <h2>Log Analysis Results</h2>
@@ -193,13 +194,13 @@ def generate_html_report(scan: Optional[Dict] = None, analysis: Optional[Dict] =
                 </tr>
             """
         html += "</table>"
-    
+
     html += """
         </div>
     </body>
     </html>
     """
-    
+
     return html
 
 
@@ -213,6 +214,6 @@ if __name__ == "__main__":
         "profile": "balanced",
         "open_ports": [22, 80, 443]
     }
-    
+
     print("JSON Export:")
     print(export_scan_to_json(test_scan))

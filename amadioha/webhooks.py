@@ -2,7 +2,7 @@
 
 import json
 import requests
-from typing import Dict, List
+from typing import Dict
 from datetime import datetime
 from amadioha import database
 
@@ -14,7 +14,7 @@ def load_webhook_config() -> Dict:
         config_path = Path(__file__).parent.parent / "webhook_config.json"
         with open(config_path, 'r') as f:
             return json.load(f)
-    except:
+    except BaseException:
         return {}
 
 
@@ -23,7 +23,7 @@ def send_slack_alert(webhook_url: str, threat_data: Dict) -> tuple[bool, int]:
     try:
         # Format Slack message
         color = "danger" if threat_data.get('severity') == 'critical' else "warning"
-        
+
         slack_message = {
             "attachments": [
                 {
@@ -50,9 +50,9 @@ def send_slack_alert(webhook_url: str, threat_data: Dict) -> tuple[bool, int]:
                 }
             ]
         }
-        
+
         response = requests.post(webhook_url, json=slack_message, timeout=10)
-        
+
         # Log to database
         database.save_webhook_alert(
             webhook_url=webhook_url,
@@ -61,7 +61,7 @@ def send_slack_alert(webhook_url: str, threat_data: Dict) -> tuple[bool, int]:
             severity=threat_data.get('severity', ''),
             response_code=response.status_code
         )
-        
+
         return response.status_code == 200, response.status_code
     except Exception as e:
         print(f"Slack webhook error: {e}")
@@ -80,7 +80,7 @@ def send_discord_alert(webhook_url: str, threat_data: Dict) -> tuple[bool, int]:
     try:
         # Format Discord embed message
         color = 0xDC143C if threat_data.get('severity') == 'critical' else 0xFFD700
-        
+
         discord_message = {
             "embeds": [
                 {
@@ -107,9 +107,9 @@ def send_discord_alert(webhook_url: str, threat_data: Dict) -> tuple[bool, int]:
                 }
             ]
         }
-        
+
         response = requests.post(webhook_url, json=discord_message, timeout=10)
-        
+
         # Log to database
         database.save_webhook_alert(
             webhook_url=webhook_url,
@@ -118,7 +118,7 @@ def send_discord_alert(webhook_url: str, threat_data: Dict) -> tuple[bool, int]:
             severity=threat_data.get('severity', ''),
             response_code=response.status_code
         )
-        
+
         return response.status_code in [200, 204], response.status_code
     except Exception as e:
         print(f"Discord webhook error: {e}")
@@ -142,9 +142,9 @@ def send_custom_webhook(webhook_url: str, threat_data: Dict) -> tuple[bool, int]
             "details": threat_data.get('details'),
             "timestamp": datetime.now().isoformat()
         }
-        
+
         response = requests.post(webhook_url, json=payload, timeout=10)
-        
+
         # Log to database
         database.save_webhook_alert(
             webhook_url=webhook_url,
@@ -153,7 +153,7 @@ def send_custom_webhook(webhook_url: str, threat_data: Dict) -> tuple[bool, int]
             severity=threat_data.get('severity', ''),
             response_code=response.status_code
         )
-        
+
         return response.status_code == 200, response.status_code
     except Exception as e:
         print(f"Custom webhook error: {e}")
@@ -170,16 +170,16 @@ def send_custom_webhook(webhook_url: str, threat_data: Dict) -> tuple[bool, int]
 def send_webhook_alert(threat_data: Dict) -> Dict:
     """Send threat alert via configured webhooks."""
     config = load_webhook_config()
-    
+
     if not config.get('enabled'):
         return {"sent": 0, "failed": 0}
-    
+
     webhook_url = config.get('webhook_url')
     webhook_type = config.get('webhook_type', 'custom')
-    
+
     if not webhook_url:
         return {"sent": 0, "failed": 0}
-    
+
     # Send to appropriate service
     if webhook_type == 'slack':
         success, code = send_slack_alert(webhook_url, threat_data)
@@ -187,7 +187,7 @@ def send_webhook_alert(threat_data: Dict) -> Dict:
         success, code = send_discord_alert(webhook_url, threat_data)
     else:
         success, code = send_custom_webhook(webhook_url, threat_data)
-    
+
     return {
         "sent": 1 if success else 0,
         "failed": 0 if success else 1,
@@ -202,6 +202,6 @@ if __name__ == "__main__":
         "severity": "high",
         "details": "Suspicious port scanning activity detected on 192.168.1.100"
     }
-    
+
     result = send_webhook_alert(test_threat)
     print(f"Webhook alert result: {result}")

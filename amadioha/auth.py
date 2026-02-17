@@ -30,7 +30,7 @@ def verify_password(stored_hash: str, password: str) -> bool:
         salt, pwd_hash = stored_hash.split('$')
         pwd_check = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
         return pwd_check.hex() == pwd_hash
-    except:
+    except BaseException:
         return False
 
 
@@ -70,39 +70,45 @@ def validate_email(email: str) -> bool:
     return re.match(pattern, email) is not None
 
 
-def register_user(username: str, password: str, email: str, role: str = 'user') -> tuple[bool, str, int]:
+def register_user(username: str, password: str, email: str,
+                  role: str = 'user') -> tuple[bool, str, int]:
     """Register a new user."""
     # Validate inputs
     valid_username, msg = validate_username(username)
     if not valid_username:
         return False, msg, -1
-    
+
     valid_password, msg = validate_password(password)
     if not valid_password:
         return False, msg, -1
-    
+
     if not validate_email(email):
         return False, "Invalid email format", -1
-    
+
     # Hash password
     password_hash = hash_password(password)
-    
+
     # Create user
     user_id = database.create_user(username, password_hash, email, role=role)
-    
+
     if user_id == -1:
         return False, "Username already exists", -1
-    
+
     return True, "User registered successfully", user_id
 
 
-def login_user(username: str, password: str, mfa_code: Optional[str] = None) -> tuple[bool, str, Optional[Dict], bool]:
+def login_user(username: str,
+               password: str,
+               mfa_code: Optional[str] = None) -> tuple[bool,
+                                                        str,
+                                                        Optional[Dict],
+                                                        bool]:
     """Login a user."""
     user = database.get_user_by_username(username)
-    
+
     if not user:
         return False, "Username or password incorrect", None, False
-    
+
     if not verify_password(user['password_hash'], password):
         return False, "Username or password incorrect", None, False
 
@@ -111,10 +117,10 @@ def login_user(username: str, password: str, mfa_code: Optional[str] = None) -> 
             return False, "MFA code required", None, True
         if not verify_totp(user.get('mfa_secret') or "", mfa_code):
             return False, "Invalid MFA code", None, True
-    
+
     # Update last login
     database.update_user_last_login(user['id'])
-    
+
     # Return user info without password hash
     user_info = {
         'id': user['id'],
@@ -124,7 +130,7 @@ def login_user(username: str, password: str, mfa_code: Optional[str] = None) -> 
         'created_at': user['created_at'],
         'last_login': user['last_login']
     }
-    
+
     return True, "Login successful", user_info, False
 
 
@@ -141,7 +147,11 @@ def generate_mfa_secret() -> str:
     return base64.b32encode(raw).decode('utf-8').replace('=', '')
 
 
-def get_totp_token(secret: str, for_time: Optional[int] = None, digits: int = 6, interval: int = 30) -> str:
+def get_totp_token(
+        secret: str,
+        for_time: Optional[int] = None,
+        digits: int = 6,
+        interval: int = 30) -> str:
     """Generate TOTP token for a secret."""
     if not secret:
         return ""
@@ -174,7 +184,7 @@ if __name__ == "__main__":
     # Test user registration
     success, msg, uid = register_user("testuser", "TestPass123", "test@example.com")
     print(f"Register: {success}, {msg}, ID: {uid}")
-    
+
     # Test login
     success, msg, user = login_user("testuser", "TestPass123")
     print(f"Login: {success}, {msg}, {user}")

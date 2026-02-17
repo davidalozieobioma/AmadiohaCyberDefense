@@ -98,36 +98,36 @@ def normalize_url(url: str) -> str:
 def check_phishing_patterns(url: str) -> List[str]:
     """Check for common phishing patterns in URL."""
     patterns = []
-    
+
     # Check for IP address instead of domain
     if re.match(r'https?://(\d+\.){3}\d+', url):
         patterns.append("Uses IP address instead of domain")
-    
+
     # Check for suspicious characters
     if '%' in url or '&#' in url:
         patterns.append("Contains encoded characters")
-    
+
     # Check for URL shorteners
     if any(shortener in url for shortener in ['bit.ly', 'tinyurl.com', 'short.link']):
         patterns.append("Uses URL shortener")
-    
+
     # Check for homograph attacks (similar looking domains)
     suspicious_domains = ['paypa1.com', 'amaz0n.com', 'micr0soft.com', 'g00gle.com']
     if any(suspicious in url for suspicious in suspicious_domains):
         patterns.append("Homograph attack detected")
-    
+
     # Check for excessive subdomains
     domain_parts = urlparse(url).netloc.split('.')
     if len(domain_parts) > 4:
         patterns.append("Excessive subdomains")
-    
+
     return patterns
 
 
 def scan_url(url: str) -> Dict:
     """Scan a URL for legitimacy and threats."""
     domain = normalize_url(url)
-    
+
     # Check whitelist first
     if domain in KNOWN_LEGITIMATE_URLS:
         return {
@@ -142,7 +142,7 @@ def scan_url(url: str) -> Dict:
             "last_checked": datetime.now().isoformat(),
             "phishing_patterns": []
         }
-    
+
     # Check blacklist
     if domain in KNOWN_MALICIOUS_URLS:
         return {
@@ -157,21 +157,21 @@ def scan_url(url: str) -> Dict:
             "last_checked": datetime.now().isoformat(),
             "phishing_patterns": check_phishing_patterns(url)
         }
-    
+
     # Unknown domain - perform heuristic analysis
     phishing_patterns = check_phishing_patterns(url)
-    
+
     # Calculate legitimacy score based on patterns
     score = 75  # Default for unknown
     if phishing_patterns:
         score -= len(phishing_patterns) * 10
-    
+
     # Check for HTTPS
     if not url.startswith("https://"):
         score -= 15
-    
+
     score = max(0, min(100, score))  # Clamp between 0-100
-    
+
     # Determine status based on score
     if score >= 80:
         status = "Safe"
@@ -181,7 +181,7 @@ def scan_url(url: str) -> Dict:
         status = "Risky"
     else:
         status = "Malicious"
-    
+
     return {
         "url": url,
         "domain": domain,
@@ -219,13 +219,16 @@ def get_legitimacy_badge(score: int) -> str:
 def get_threat_summary(scan_result: Dict) -> str:
     """Get human-readable threat summary."""
     patterns = scan_result.get("phishing_patterns", [])
-    
+
     if scan_result["status"] == "Safe":
         return "This website appears to be legitimate and safe."
     elif scan_result["status"] == "Malicious":
-        return f"⚠️ DANGER: This website is known to be malicious. Threat: {scan_result.get('threat_type')}"
+        threat = scan_result.get('threat_type')
+        return f"⚠️ DANGER: This website is known to be malicious. Threat: {threat}"
     elif scan_result["status"] == "Phishing":
-        return f"⚠️ WARNING: This appears to be a phishing website. Do not enter sensitive information."
+        msg = ("⚠️ WARNING: This appears to be a phishing website. "
+               "Do not enter sensitive information.")
+        return msg
     elif scan_result["status"] == "Suspicious":
         indicators = ", ".join(patterns) if patterns else "Unknown indicators"
         return f"⚠️ CAUTION: This website shows suspicious signs. {indicators}"
@@ -241,7 +244,7 @@ if __name__ == "__main__":
         "https://phishing-bank.net",
         "http://suspicious-site.xyz"
     ]
-    
+
     for url in test_urls:
         result = scan_url(url)
         print(f"\nURL: {url}")

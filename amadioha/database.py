@@ -2,17 +2,19 @@
 
 import sqlite3
 import json
+import secrets
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
 
 DB_PATH = Path(__file__).parent.parent / "amadioha.db"
 
+
 def init_db():
     """Initialize the database with required tables."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     # Scans table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS scans (
@@ -27,7 +29,7 @@ def init_db():
             timeout REAL
         )
     """)
-    
+
     # Analyses table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS analyses (
@@ -38,7 +40,7 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    
+
     # IP Intelligence table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS ip_intel (
@@ -53,7 +55,7 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    
+
     # Email alerts table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_alerts (
@@ -66,7 +68,7 @@ def init_db():
             status TEXT DEFAULT 'sent'
         )
     """)
-    
+
     # Website scans table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS website_scans (
@@ -81,7 +83,7 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    
+
     # Vulnerabilities/CVE table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS vulnerabilities (
@@ -96,7 +98,7 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    
+
     # Webhook alerts table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS webhook_alerts (
@@ -110,7 +112,7 @@ def init_db():
             response_code INTEGER
         )
     """)
-    
+
     # Scan schedules table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS scan_schedules (
@@ -125,7 +127,7 @@ def init_db():
             last_run DATETIME
         )
     """)
-    
+
     # Users table for authentication
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -319,24 +321,24 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     """)
-    
+
     conn.commit()
     conn.close()
 
 
-def save_scan(target: str, start_port: int, end_port: int, open_ports: List[int], 
+def save_scan(target: str, start_port: int, end_port: int, open_ports: List[int],
               profile: str, workers: int, timeout: float) -> int:
     """Save a network scan result to the database."""
     init_db()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     open_ports_json = json.dumps(open_ports)
     cursor.execute("""
         INSERT INTO scans (target, start_port, end_port, open_ports, profile, workers, timeout)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (target, start_port, end_port, open_ports_json, profile, workers, timeout))
-    
+
     conn.commit()
     scan_id = cursor.lastrowid
     conn.close()
@@ -348,13 +350,13 @@ def save_analysis(log_file: str, total_ips: int, threats: List[Dict]) -> int:
     init_db()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     threats_json = json.dumps(threats)
     cursor.execute("""
         INSERT INTO analyses (log_file, total_ips, threats)
         VALUES (?, ?, ?)
     """, (log_file, total_ips, threats_json))
-    
+
     conn.commit()
     analysis_id = cursor.lastrowid
     conn.close()
@@ -367,13 +369,15 @@ def save_ip_intel(ip: str, reputation_score: int, threat_type: str, abuse_report
     init_db()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute("""
-        INSERT INTO ip_intel (ip_address, reputation_score, threat_type, abuse_reports,
-                             known_for_attacks, confidence, last_reported)
+        INSERT INTO ip_intel
+        (ip_address, reputation_score, threat_type, abuse_reports,
+         known_for_attacks, confidence, last_reported)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (ip, reputation_score, threat_type, abuse_reports, known_for_attacks, confidence, last_reported))
-    
+    """, (ip, reputation_score, threat_type, abuse_reports,
+          known_for_attacks, confidence, last_reported))
+
     conn.commit()
     intel_id = cursor.lastrowid
     conn.close()
@@ -386,17 +390,17 @@ def get_scan_history(limit: int = 50) -> List[Dict]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         SELECT id, target, start_port, end_port, open_ports, profile, timestamp, workers, timeout
         FROM scans
         ORDER BY timestamp DESC
         LIMIT ?
     """, (limit,))
-    
+
     rows = cursor.fetchall()
     conn.close()
-    
+
     results = []
     for row in rows:
         results.append({
@@ -410,7 +414,7 @@ def get_scan_history(limit: int = 50) -> List[Dict]:
             "workers": row["workers"],
             "timeout": row["timeout"]
         })
-    
+
     return results
 
 
@@ -420,17 +424,17 @@ def get_analysis_history(limit: int = 50) -> List[Dict]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         SELECT id, log_file, total_ips, threats, timestamp
         FROM analyses
         ORDER BY timestamp DESC
         LIMIT ?
     """, (limit,))
-    
+
     rows = cursor.fetchall()
     conn.close()
-    
+
     results = []
     for row in rows:
         results.append({
@@ -440,7 +444,7 @@ def get_analysis_history(limit: int = 50) -> List[Dict]:
             "threats": json.loads(row["threats"]),
             "timestamp": row["timestamp"]
         })
-    
+
     return results
 
 
@@ -449,12 +453,12 @@ def save_email_alert(recipient_email: str, ip_address: str, threat_type: str, se
     init_db()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         INSERT INTO email_alerts (recipient_email, ip_address, threat_type, severity)
         VALUES (?, ?, ?, ?)
     """, (recipient_email, ip_address, threat_type, severity))
-    
+
     conn.commit()
     alert_id = cursor.lastrowid
     conn.close()
@@ -467,34 +471,34 @@ def get_email_alert_history(limit: int = 50) -> List[Dict]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         SELECT id, recipient_email, ip_address, threat_type, severity, sent_at, status
         FROM email_alerts
         ORDER BY sent_at DESC
         LIMIT ?
     """, (limit,))
-    
+
     rows = cursor.fetchall()
     conn.close()
-    
+
     return [dict(row) for row in rows]
 
 
 def save_website_scan(url: str, domain: str, legitimacy_score: int, status: str,
-                     threat_type: str, phishing_patterns: List[str], ssl_valid: bool) -> int:
+                      threat_type: str, phishing_patterns: List[str], ssl_valid: bool) -> int:
     """Save a website scan result to the database."""
     init_db()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     patterns_json = json.dumps(phishing_patterns)
     cursor.execute("""
         INSERT INTO website_scans (url, domain, legitimacy_score, status, threat_type,
                                   phishing_patterns, ssl_valid)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (url, domain, legitimacy_score, status, threat_type, patterns_json, ssl_valid))
-    
+
     conn.commit()
     scan_id = cursor.lastrowid
     conn.close()
@@ -507,7 +511,7 @@ def get_website_scan_history(limit: int = 50) -> List[Dict]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         SELECT id, url, domain, legitimacy_score, status, threat_type, phishing_patterns,
                ssl_valid, timestamp
@@ -515,10 +519,10 @@ def get_website_scan_history(limit: int = 50) -> List[Dict]:
         ORDER BY timestamp DESC
         LIMIT ?
     """, (limit,))
-    
+
     rows = cursor.fetchall()
     conn.close()
-    
+
     results = []
     for row in rows:
         results.append({
@@ -532,23 +536,23 @@ def get_website_scan_history(limit: int = 50) -> List[Dict]:
             "ssl_valid": row["ssl_valid"],
             "timestamp": row["timestamp"]
         })
-    
+
     return results
 
 
 def save_vulnerability(port: int, service_name: str, cve_id: str, cvss_score: float,
-                      severity: str, description: str, remediation: str) -> int:
+                       severity: str, description: str, remediation: str) -> int:
     """Save a vulnerability/CVE record."""
     init_db()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         INSERT INTO vulnerabilities (port, service_name, cve_id, cvss_score, severity,
                                      description, remediation)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (port, service_name, cve_id, cvss_score, severity, description, remediation))
-    
+
     conn.commit()
     vuln_id = cursor.lastrowid
     conn.close()
@@ -561,7 +565,7 @@ def get_vulnerabilities_by_port(port: int) -> List[Dict]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         SELECT id, port, service_name, cve_id, cvss_score, severity, description,
                remediation, timestamp
@@ -569,26 +573,26 @@ def get_vulnerabilities_by_port(port: int) -> List[Dict]:
         WHERE port = ?
         ORDER BY cvss_score DESC
     """, (port,))
-    
+
     rows = cursor.fetchall()
     conn.close()
-    
+
     return [dict(row) for row in rows]
 
 
 def save_webhook_alert(webhook_url: str, webhook_type: str, threat_type: str,
-                      severity: str, response_code: int) -> int:
+                       severity: str, response_code: int) -> int:
     """Log a webhook alert."""
     init_db()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         INSERT INTO webhook_alerts (webhook_url, webhook_type, threat_type, severity,
                                    response_code)
         VALUES (?, ?, ?, ?, ?)
     """, (webhook_url, webhook_type, threat_type, severity, response_code))
-    
+
     conn.commit()
     webhook_id = cursor.lastrowid
     conn.close()
@@ -601,7 +605,7 @@ def get_webhook_alert_history(limit: int = 50) -> List[Dict]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         SELECT id, webhook_url, webhook_type, threat_type, severity, sent_at, status,
                response_code
@@ -609,25 +613,25 @@ def get_webhook_alert_history(limit: int = 50) -> List[Dict]:
         ORDER BY sent_at DESC
         LIMIT ?
     """, (limit,))
-    
+
     rows = cursor.fetchall()
     conn.close()
-    
+
     return [dict(row) for row in rows]
 
 
 def save_scan_schedule(target: str, scan_type: str, schedule_time: str, frequency: str,
-                      profile: str) -> int:
+                       profile: str) -> int:
     """Save a scheduled scan."""
     init_db()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         INSERT INTO scan_schedules (target, scan_type, schedule_time, frequency, profile)
         VALUES (?, ?, ?, ?, ?)
     """, (target, scan_type, schedule_time, frequency, profile))
-    
+
     conn.commit()
     schedule_id = cursor.lastrowid
     conn.close()
@@ -640,7 +644,7 @@ def get_scan_schedules() -> List[Dict]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         SELECT id, target, scan_type, schedule_time, frequency, profile, enabled,
                created_at, last_run
@@ -648,10 +652,10 @@ def get_scan_schedules() -> List[Dict]:
         WHERE enabled = 1
         ORDER BY schedule_time
     """)
-    
+
     rows = cursor.fetchall()
     conn.close()
-    
+
     return [dict(row) for row in rows]
 
 
@@ -660,13 +664,13 @@ def create_user(username: str, password_hash: str, email: str, role: str = 'user
     init_db()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     try:
         cursor.execute("""
             INSERT INTO users (username, password_hash, email, role)
             VALUES (?, ?, ?, ?)
         """, (username, password_hash, email, role))
-        
+
         conn.commit()
         user_id = cursor.lastrowid
         conn.close()
@@ -682,17 +686,17 @@ def get_user_by_username(username: str) -> Optional[Dict]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
+
     cursor.execute("""
          SELECT id, username, password_hash, email, role, created_at, last_login,
              mfa_secret, mfa_enabled, mfa_updated
         FROM users
         WHERE username = ?
     """, (username,))
-    
+
     row = cursor.fetchone()
     conn.close()
-    
+
     return dict(row) if row else None
 
 
@@ -721,13 +725,13 @@ def update_user_last_login(user_id: int):
     init_db()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         UPDATE users
         SET last_login = CURRENT_TIMESTAMP
         WHERE id = ?
     """, (user_id,))
-    
+
     conn.commit()
     conn.close()
 
@@ -767,7 +771,7 @@ def get_all_users() -> List[Dict]:
     cursor = conn.cursor()
 
     cursor.execute("""
-         SELECT id, username, email, role, created_at, last_login, mfa_secret, 
+         SELECT id, username, email, role, created_at, last_login, mfa_secret,
                 mfa_enabled, mfa_updated
         FROM users
         ORDER BY created_at DESC
@@ -790,7 +794,7 @@ def delete_user(user_id: int) -> bool:
         conn.commit()
         conn.close()
         return True
-    except Exception as e:
+    except Exception:
         conn.close()
         return False
 
@@ -810,7 +814,7 @@ def update_user_role(user_id: int, role: str) -> bool:
         conn.commit()
         conn.close()
         return True
-    except Exception as e:
+    except Exception:
         conn.close()
         return False
 
@@ -873,7 +877,7 @@ def get_activity_logs(limit: int = 100) -> List[Dict]:
 # THREAT LOGS
 # ============================================================================
 
-def log_threat(threat_type: str, ip_address: str, severity: str, port: int = None, 
+def log_threat(threat_type: str, ip_address: str, severity: str, port: int = None,
                scan_id: int = None, details: str = "") -> int:
     """Log a threat detection."""
     init_db()
@@ -1108,8 +1112,8 @@ def get_user_usage(user_id: int, month_year: str = None) -> Optional[Dict]:
     return dict(row) if row else None
 
 
-def update_usage(user_id: int, scans: int = 0, analyses: int = 0, api_calls: int = 0, 
-                bandwidth_mb: float = 0) -> bool:
+def update_usage(user_id: int, scans: int = 0, analyses: int = 0, api_calls: int = 0,
+                 bandwidth_mb: float = 0) -> bool:
     """Update user usage statistics."""
     init_db()
     conn = sqlite3.connect(DB_PATH)
@@ -1143,7 +1147,7 @@ def get_user_limits(user_id: int) -> Optional[Dict]:
 
 
 def set_user_limits(user_id: int, max_concurrent: int = 5, max_monthly: int = 100,
-                   max_api_calls: int = 100, bandwidth_limit: int = 5000) -> bool:
+                    max_api_calls: int = 100, bandwidth_limit: int = 5000) -> bool:
     """Set usage limits for a user."""
     init_db()
     conn = sqlite3.connect(DB_PATH)
@@ -1151,9 +1155,11 @@ def set_user_limits(user_id: int, max_concurrent: int = 5, max_monthly: int = 10
 
     cursor.execute("""
         INSERT OR REPLACE INTO usage_limits
-        (user_id, max_concurrent_scans, max_monthly_scans, max_api_calls_per_hour, bandwidth_limit_mb)
+        (user_id, max_concurrent_scans, max_monthly_scans,
+         max_api_calls_per_hour, bandwidth_limit_mb)
         VALUES (?, ?, ?, ?, ?)
-    """, (user_id, max_concurrent, max_monthly, max_api_calls, bandwidth_limit))
+    """, (user_id, max_concurrent, max_monthly, max_api_calls,
+          bandwidth_limit))
 
     conn.commit()
     conn.close()
@@ -1276,8 +1282,8 @@ def get_backup_records(limit: int = 50) -> List[Dict]:
 # SECURITY ALERTS
 # ============================================================================
 
-def create_security_alert(alert_type: str, user_id: int, channel: str, 
-                         contact_info: str, severity_threshold: str = "HIGH") -> int:
+def create_security_alert(alert_type: str, user_id: int, channel: str,
+                          contact_info: str, severity_threshold: str = "HIGH") -> int:
     """Create security alert configuration."""
     init_db()
     conn = sqlite3.connect(DB_PATH)

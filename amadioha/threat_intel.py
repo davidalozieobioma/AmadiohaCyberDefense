@@ -1,9 +1,8 @@
 """Threat Intelligence module for IP reputation and abuse reporting."""
 
 import argparse
-from typing import Dict, Tuple
+from typing import Dict
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 
 console = Console()
@@ -47,7 +46,7 @@ KNOWN_THREATS = {
 
 def lookup_ip(ip: str) -> Dict:
     """Look up an IP in the threat database.
-    
+
     Returns reputation data or a clean profile if not found.
     """
     if ip in KNOWN_THREATS:
@@ -65,12 +64,12 @@ def lookup_ip(ip: str) -> Dict:
 
 def display_ip_intel(ip: str, data: Dict) -> None:
     """Display threat intelligence for an IP in a formatted panel."""
-    
+
     risk_level = "🔴 CRITICAL" if data["reputation_score"] > 80 else \
                  "🟠 HIGH" if data["reputation_score"] > 60 else \
                  "🟡 MEDIUM" if data["reputation_score"] > 40 else \
                  "🟢 LOW"
-    
+
     content = f"""
 [bold cyan]IP Address:[/bold cyan] {ip}
 [bold cyan]Risk Level:[/bold cyan] {risk_level}
@@ -78,11 +77,14 @@ def display_ip_intel(ip: str, data: Dict) -> None:
 [bold cyan]Threat Type:[/bold cyan] {data['threat_type']}
 [bold cyan]Abuse Reports:[/bold cyan] {data['abuse_reports']}
 [bold cyan]Known for Attacks:[/bold cyan] {'✓ Yes' if data['known_for_attacks'] else '✗ No'}
-[bold cyan]Confidence:[/bold cyan] {data['confidence']*100:.0f}%
+[bold cyan]Confidence:[/bold cyan] {data['confidence'] * 100:.0f}%
 [bold cyan]Last Reported:[/bold cyan] {data['last_reported'] or 'Never'}
 """
-    
-    panel = Panel(content.strip(), title=f"[bold white]Threat Intel Report[/bold white]", expand=False)
+
+    panel = Panel(
+        content.strip(),
+        title="[bold white]Threat Intel Report[/bold white]",
+        expand=False)
     console.print(panel)
 
 
@@ -90,7 +92,7 @@ def main():
     parser = argparse.ArgumentParser(description="Threat Intelligence IP Lookup")
     parser.add_argument("--ip", required=True, help="IP address to lookup")
     args = parser.parse_args()
-    
+
     intel_data = lookup_ip(args.ip)
     display_ip_intel(args.ip, intel_data)
 

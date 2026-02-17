@@ -6,6 +6,7 @@ console = Console()
 
 FAILED_PATTERN = r"Failed password.*from (\d+\.\d+\.\d+\.\d+)"
 
+
 def analyze_log(log_file):
     ip_counts = {}
 
