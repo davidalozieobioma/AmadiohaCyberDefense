@@ -1,0 +1,5 @@
+{
+  "webhook_url": "https://example.com/webhook",
+  "webhook_type": "custom",
+  "enabled": true
+}

@@ -1,0 +1,7 @@
+{
+  "smtp_server": "smtp.gmail.com",
+  "smtp_port": 587,
+  "sender_email": "davidalozieobioma@gmail.com",
+  "sender_password": "Amadioha@2026#Security",
+  "enabled": false
+}

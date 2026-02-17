@@ -7,7 +7,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         :root {
             --primary: #0d6efd;
@@ -116,35 +115,20 @@
             border: none;
         }
         
-        .nav-tabs {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 12px;
-            padding: 6px;
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
-        }
-
-        body.dark-mode .nav-tabs {
-            background: rgba(30, 30, 46, 0.95);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
-        }
-
         .nav-tabs .nav-link {
-            color: #0b5ed7;
+            color: #666;
             border: none;
-            font-weight: 700;
-            padding: 10px 16px;
-            border-radius: 10px;
+            font-weight: 500;
         }
-
+        
         body.dark-mode .nav-tabs .nav-link {
-            color: #9ecbff;
+            color: #aaa;
         }
-
+        
         .nav-tabs .nav-link.active {
-            color: #ffffff;
-            background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);
-            border: none;
-            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
+            color: #0d6efd;
+            border-bottom: 3px solid #0d6efd;
+            background: none;
         }
         
         .badge {
@@ -178,18 +162,6 @@
             height: 300px;
             margin: 20px 0;
         }
-
-        .topology-container {
-            height: 420px;
-            border-radius: 10px;
-            border: 2px solid #e9ecef;
-            background: #f8f9fa;
-        }
-
-        body.dark-mode .topology-container {
-            border-color: #444;
-            background: #2b2b3f;
-        }
         
         .loading {
             text-align: center;
@@ -213,10 +185,6 @@
         <div class="container-fluid">
             <span class="navbar-brand">🛡️ Amadioha Cyber Defense</span>
             <div class="d-flex align-items-center gap-3">
-                {% if current_user %}
-                <span class="text-light">Signed in as {{ current_user.username }}</span>
-                <a class="btn btn-outline-light btn-sm" href="/logout">Sign Out</a>
-                {% endif %}
                 <span class="theme-toggle" id="themeToggle" title="Toggle dark mode">
                     <i class="bi bi-moon-stars"></i>
                 </span>
@@ -235,9 +203,6 @@
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="vulnerabilities-tab" data-bs-toggle="tab" data-bs-target="#vulnerabilities">Vulnerabilities</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="topology-tab" data-bs-toggle="tab" data-bs-target="#topology">Topology</button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history">History</button>
@@ -281,20 +246,6 @@
                                 <input type="text" class="form-control mb-2" id="logFile" placeholder="/var/log/auth.log">
                                 <button class="btn btn-primary w-100" id="analyzeBtn">📊 Analyze Log</button>
                                 <div id="analysisStatus" class="mt-3"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Threat Intelligence -->
-                    <div class="col-lg-6 col-xl-4">
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <i class="bi bi-shield-exclamation"></i> Threat Intel
-                            </div>
-                            <div class="card-body">
-                                <input type="text" class="form-control mb-2" id="intelIP" placeholder="IP Address (e.g., 8.8.8.8)">
-                                <button class="btn btn-primary w-100" id="intelBtn">🛰️ Check Intel</button>
-                                <div id="intelStatus" class="mt-3"></div>
                             </div>
                         </div>
                     </div>
@@ -460,25 +411,6 @@
                 </div>
             </div>
 
-            <!-- Topology Tab -->
-            <div class="tab-pane fade" id="topology">
-                <div class="row">
-                    <div class="col-lg-12">
-                        <div class="dashboard-card">
-                            <div class="card-header">Network Topology Visualization</div>
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <div class="text-muted">Uses latest scan results to build a live topology map.</div>
-                                    <button class="btn btn-primary" id="refreshTopologyBtn">🔄 Refresh</button>
-                                </div>
-                                <div id="topologyContainer" class="topology-container"></div>
-                                <div id="topologyStatus" class="mt-3"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- History Tab -->
             <div class="tab-pane fade" id="history">
                 <div class="row">
@@ -558,59 +490,43 @@
                 </div>
 
                 <div class="row mt-4">
-                    {% if current_user and current_user.role == 'admin' %}
-                    <!-- Admin Create User -->
+                    <!-- User Management -->
                     <div class="col-lg-6">
                         <div class="dashboard-card">
-                            <div class="card-header">👤 Admin: Create User</div>
+                            <div class="card-header">👤 User Account</div>
                             <div class="card-body">
                                 <div class="form-group mb-3">
                                     <label>Username</label>
-                                    <input type="text" class="form-control" id="adminNewUsername">
+                                    <input type="text" class="form-control" id="registerUsername">
                                 </div>
                                 <div class="form-group mb-3">
                                     <label>Email</label>
-                                    <input type="email" class="form-control" id="adminNewEmail">
+                                    <input type="email" class="form-control" id="registerEmail">
                                 </div>
                                 <div class="form-group mb-3">
                                     <label>Password</label>
-                                    <input type="password" class="form-control" id="adminNewPassword">
+                                    <input type="password" class="form-control" id="registerPassword">
                                 </div>
-                                <div class="form-group mb-3">
-                                    <label>Role</label>
-                                    <select class="form-select" id="adminNewRole">
-                                        <option value="user" selected>User</option>
-                                        <option value="admin">Admin</option>
-                                    </select>
-                                </div>
-                                <button class="btn btn-primary w-100" id="adminCreateUserBtn">✅ Create User</button>
-                                <div id="adminCreateUserStatus" class="mt-3"></div>
+                                <button class="btn btn-primary w-100" id="registerBtn">✅ Register User</button>
                             </div>
                         </div>
                     </div>
-                    {% endif %}
 
-                    <!-- MFA Setup -->
+                    <!-- Login -->
                     <div class="col-lg-6">
                         <div class="dashboard-card">
-                            <div class="card-header">🔐 Multi-Factor Authentication (MFA)</div>
+                            <div class="card-header">🔐 Login</div>
                             <div class="card-body">
-                                <button class="btn btn-primary w-100 mb-3" id="mfaSetupBtn">Generate MFA Secret</button>
                                 <div class="form-group mb-3">
-                                    <label>Secret (add to Authenticator)</label>
-                                    <input type="text" class="form-control" id="mfaSecret" readonly>
+                                    <label>Username</label>
+                                    <input type="text" class="form-control" id="loginUsername">
                                 </div>
                                 <div class="form-group mb-3">
-                                    <label>OTP Auth URL (advanced)</label>
-                                    <input type="text" class="form-control" id="mfaOtpUrl" readonly>
+                                    <label>Password</label>
+                                    <input type="password" class="form-control" id="loginPassword">
                                 </div>
-                                <div class="form-group mb-3">
-                                    <label>MFA Code (from authenticator)</label>
-                                    <input type="text" class="form-control" id="mfaCode" placeholder="123456">
-                                </div>
-                                <button class="btn btn-secondary w-100" id="mfaEnableBtn">Enable MFA</button>
-                                <div class="alert alert-info mt-3">Use Google Authenticator, Microsoft Authenticator, or Authy.</div>
-                                <div id="mfaStatus" class="mt-3"></div>
+                                <button class="btn btn-primary w-100" id="loginBtn">🔓 Login</button>
+                                <div id="loginStatus" class="mt-3"></div>
                             </div>
                         </div>
                     </div>
@@ -645,12 +561,9 @@
             setTimeout(() => alertDiv.remove(), 5000);
         }
 
-        let topologyNetwork = null;
-
         // Load analytics on tab click
         document.getElementById('analytics-tab').addEventListener('click', loadAnalytics);
         document.getElementById('vulnerabilities-tab').addEventListener('click', loadVulnerabilities);
-        document.getElementById('topology-tab').addEventListener('click', loadTopology);
         document.getElementById('history-tab').addEventListener('click', loadHistory);
 
         async function loadAnalytics() {
@@ -741,56 +654,11 @@
             }
         }
 
-        async function loadTopology() {
-            const container = document.getElementById('topologyContainer');
-            const status = document.getElementById('topologyStatus');
-
-            status.innerHTML = '<div class="loading">Building topology...</div>';
-            try {
-                const response = await fetch('/api/topology/network');
-                const data = await response.json();
-
-                if (!response.ok) {
-                    status.innerHTML = `<div class="alert alert-danger">${data.error || 'Failed to load topology'}</div>`;
-                    return;
-                }
-
-                if (!data.nodes || data.nodes.length === 0) {
-                    status.innerHTML = '<div class="alert alert-info">No scan data available for topology.</div>';
-                    return;
-                }
-
-                const nodes = new vis.DataSet(data.nodes);
-                const edges = new vis.DataSet(data.edges || []);
-
-                const options = {
-                    nodes: {
-                        shape: 'dot',
-                        size: 18,
-                        font: {size: 14}
-                    },
-                    edges: {
-                        arrows: 'to',
-                        smooth: true
-                    },
-                    physics: {
-                        stabilization: true
-                    }
-                };
-
-                topologyNetwork = new vis.Network(container, {nodes, edges}, options);
-                status.innerHTML = '';
-            } catch (err) {
-                status.innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
-            }
-        }
-
         async function loadHistory() {
             try {
                 const scanRes = await fetch('/api/history/scans');
                 const scans = await scanRes.json();
-                const scanList = Array.isArray(scans) ? scans : (scans.scans || []);
-                const scanHtml = scanList.slice(0, 5).map(s => `
+                const scanHtml = scans.scans.slice(0, 5).map(s => `
                     <div class="alert alert-info mb-2">
                         <strong>${s.target}</strong> - ${s.open_ports?.length || 0} open ports
                         <br><small>${s.timestamp}</small>
@@ -800,8 +668,7 @@
 
                 const webRes = await fetch('/api/history/website-scans');
                 const websites = await webRes.json();
-                const websiteList = Array.isArray(websites) ? websites : (websites.scans || []);
-                const webHtml = websiteList.slice(0, 5).map(w => `
+                const webHtml = websites.scans.slice(0, 5).map(w => `
                     <div class="alert alert-info mb-2">
                         <strong>${w.url}</strong> - Score: ${w.legitimacy_score}/100
                         <br><small>${w.timestamp}</small>
@@ -837,102 +704,6 @@
                 document.getElementById('scanStatus').innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
             }
         });
-
-        document.getElementById('analyzeBtn').addEventListener('click', async () => {
-            const logFile = document.getElementById('logFile').value;
-            if (!logFile) return showAlert('Please enter a log file path');
-
-            document.getElementById('analysisStatus').innerHTML = '<div class="loading">Analyzing...</div>';
-            try {
-                const response = await fetch('/api/analyze', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({log_file: logFile})
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    document.getElementById('analysisStatus').innerHTML = `<div class="alert alert-success">Threats detected: ${data.threats?.length || 0}</div>`;
-                } else {
-                    document.getElementById('analysisStatus').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
-                }
-            } catch (err) {
-                document.getElementById('analysisStatus').innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
-            }
-        });
-
-        document.getElementById('intelBtn').addEventListener('click', async () => {
-            const ip = document.getElementById('intelIP').value;
-            if (!ip) return showAlert('Please enter an IP address');
-
-            document.getElementById('intelStatus').innerHTML = '<div class="loading">Checking threat intel...</div>';
-            try {
-                const response = await fetch('/api/intel', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ip})
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    document.getElementById('intelStatus').innerHTML = `
-                        <div class="alert alert-${data.reputation_score >= 70 ? 'danger' : data.reputation_score >= 40 ? 'warning' : 'success'}">
-                            <strong>Score:</strong> ${data.reputation_score || 0}/100
-                            <br><strong>Threat:</strong> ${data.threat_type || 'Unknown'}
-                        </div>`;
-                } else {
-                    document.getElementById('intelStatus').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
-                }
-            } catch (err) {
-                document.getElementById('intelStatus').innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
-            }
-        });
-
-        document.getElementById('importBtn').addEventListener('click', async () => {
-            const directory = document.getElementById('importDirectory').value;
-            const pattern = document.getElementById('importPattern').value || '*.log';
-            if (!directory) return showAlert('Please enter a directory');
-
-            document.getElementById('importStatus').innerHTML = '<div class="loading">Importing logs...</div>';
-            try {
-                const response = await fetch('/api/import/logs', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({directory, pattern})
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    document.getElementById('importStatus').innerHTML = `<div class="alert alert-success">Processed ${data.files_processed || 0} file(s)</div>`;
-                } else {
-                    document.getElementById('importStatus').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
-                }
-            } catch (err) {
-                document.getElementById('importStatus').innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
-            }
-        });
-
-        document.getElementById('scheduleBtn').addEventListener('click', async () => {
-            const target = document.getElementById('scheduleTarget').value;
-            const frequency = document.getElementById('scheduleFrequency').value;
-            if (!target) return showAlert('Please enter a target for scheduling');
-
-            document.getElementById('scheduleStatus').innerHTML = '<div class="loading">Creating schedule...</div>';
-            try {
-                const response = await fetch('/api/schedule/create', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({target, frequency})
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    document.getElementById('scheduleStatus').innerHTML = `<div class="alert alert-success">Schedule created (ID: ${data.schedule_id})</div>`;
-                } else {
-                    document.getElementById('scheduleStatus').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
-                }
-            } catch (err) {
-                document.getElementById('scheduleStatus').innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
-            }
-        });
-
-        document.getElementById('refreshTopologyBtn').addEventListener('click', loadTopology);
 
         // Website scanning
         document.getElementById('websiteBtn').addEventListener('click', async () => {
@@ -971,30 +742,11 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({scan_id: 1})
                 });
-
+                const data = await response.json();
                 if (response.ok) {
-                    const blob = await response.blob();
-                    const disposition = response.headers.get('Content-Disposition') || '';
-                    const match = disposition.match(/filename="?([^";]+)"?/i);
-                    const filename = match ? match[1] : 'SecurityReport.pdf';
-
-                    const url = window.URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = filename;
-                    document.body.appendChild(link);
-                    link.click();
-                    link.remove();
-                    window.URL.revokeObjectURL(url);
-
-                    document.getElementById('exportStatus').innerHTML = `<div class="alert alert-success">✓ ${filename} downloaded</div>`;
+                    document.getElementById('exportStatus').innerHTML = `<div class="alert alert-success">✓ ${data.filename} ready for download</div>`;
                 } else {
-                    let errorMsg = 'Failed to generate PDF';
-                    try {
-                        const data = await response.json();
-                        errorMsg = data.error || errorMsg;
-                    } catch {}
-                    document.getElementById('exportStatus').innerHTML = `<div class="alert alert-danger">${errorMsg}</div>`;
+                    document.getElementById('exportStatus').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
                 }
             } catch (err) {
                 document.getElementById('exportStatus').innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
@@ -1033,132 +785,25 @@
             }
         });
 
-        document.getElementById('adminCreateUserBtn')?.addEventListener('click', async () => {
-            const username = document.getElementById('adminNewUsername').value;
-            const email = document.getElementById('adminNewEmail').value;
-            const password = document.getElementById('adminNewPassword').value;
-            const role = document.getElementById('adminNewRole').value;
+        // User registration
+        document.getElementById('registerBtn').addEventListener('click', async () => {
+            const username = document.getElementById('registerUsername').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
 
             if (!username || !email || !password) return showAlert('Please fill all fields');
 
-            document.getElementById('adminCreateUserStatus').innerHTML = '<div class="loading">Creating user...</div>';
             try {
-                const response = await fetch('/api/admin/create-user', {
+                const response = await fetch('/api/auth/register', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username, email, password, role})
+                    body: JSON.stringify({username, email, password})
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    document.getElementById('adminCreateUserStatus').innerHTML = '<div class="alert alert-success">User created successfully</div>';
-                } else if (response.status === 403) {
-                    document.getElementById('adminCreateUserStatus').innerHTML = '<div class="alert alert-danger">Admin only. Please sign in as an administrator.</div>';
+                    showAlert(data.message, 'success');
                 } else {
-                    document.getElementById('adminCreateUserStatus').innerHTML = `<div class="alert alert-danger">${data.message || data.error}</div>`;
-                }
-            } catch (err) {
-                document.getElementById('adminCreateUserStatus').innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
-            }
-        });
-
-        document.getElementById('mfaSetupBtn').addEventListener('click', async () => {
-            document.getElementById('mfaStatus').innerHTML = '<div class="loading">Generating secret...</div>';
-            try {
-                const response = await fetch('/api/auth/mfa/setup', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    document.getElementById('mfaSecret').value = data.secret || '';
-                    document.getElementById('mfaOtpUrl').value = data.otpauth_url || '';
-                    document.getElementById('mfaStatus').innerHTML = '<div class="alert alert-info">Add the secret to your authenticator app, then enter a code below.</div>';
-                } else {
-                    document.getElementById('mfaStatus').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
-                }
-            } catch (err) {
-                document.getElementById('mfaStatus').innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
-            }
-        });
-
-        document.getElementById('mfaEnableBtn').addEventListener('click', async () => {
-            const code = document.getElementById('mfaCode').value;
-            if (!code) return showAlert('Please enter your MFA code');
-
-            document.getElementById('mfaStatus').innerHTML = '<div class="loading">Enabling MFA...</div>';
-            try {
-                const response = await fetch('/api/auth/mfa/enable', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({code})
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    document.getElementById('mfaStatus').innerHTML = '<div class="alert alert-success">MFA enabled successfully.</div>';
-                } else {
-                    document.getElementById('mfaStatus').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
-                }
-            } catch (err) {
-                document.getElementById('mfaStatus').innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
-            }
-        });
-
-        document.getElementById('saveEmailBtn').addEventListener('click', async () => {
-            const smtp_server = document.getElementById('smtpServer').value;
-            const smtp_port = parseInt(document.getElementById('smtpPort').value, 10);
-            const sender_email = document.getElementById('senderEmail').value;
-            const sender_password = document.getElementById('senderPassword').value;
-
-            try {
-                const response = await fetch('/api/email/configure', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({smtp_server, smtp_port, sender_email, sender_password})
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    showAlert('Email configuration saved', 'success');
-                } else {
-                    showAlert(data.error || 'Failed to save email config');
-                }
-            } catch (err) {
-                showAlert(`Error: ${err.message}`);
-            }
-        });
-
-        document.getElementById('saveWebhookBtn').addEventListener('click', async () => {
-            const webhook_type = document.getElementById('webhookType').value;
-            const webhook_url = document.getElementById('webhookUrl').value;
-
-            try {
-                const response = await fetch('/api/webhook/configure', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({webhook_type, webhook_url, enabled: true})
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    showAlert('Webhook configuration saved', 'success');
-                } else {
-                    showAlert(data.error || 'Failed to save webhook config');
-                }
-            } catch (err) {
-                showAlert(`Error: ${err.message}`);
-            }
-        });
-
-        document.getElementById('testWebhookBtn').addEventListener('click', async () => {
-            try {
-                const response = await fetch('/api/webhook/send-test', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({threat_type: 'Test Alert', severity: 'medium'})
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    showAlert(`Webhook test ${data.status}`, 'success');
-                } else {
-                    showAlert(data.error || 'Webhook test failed');
+                    showAlert(data.message);
                 }
             } catch (err) {
                 showAlert(`Error: ${err.message}`);
