@@ -32,7 +32,7 @@ results = {
 # Initialize scheduler
 try:
     scan_scheduler = scheduler.start_background_scheduler()
-except:
+except BaseException:
     pass  # Scheduler not critical
 
 
@@ -104,7 +104,11 @@ def login_submit():
         return redirect(url_for('dashboard'))
 
     allow_self_signup = database.count_users() == 0
-    return render_template('login.html', login_error=msg, mfa_required=mfa_required, allow_self_signup=allow_self_signup)
+    return render_template(
+        'login.html',
+        login_error=msg,
+        mfa_required=mfa_required,
+        allow_self_signup=allow_self_signup)
 
 
 @app.route('/register', methods=['POST'])
@@ -116,7 +120,10 @@ def register_submit():
 
     if database.count_users() > 0:
         allow_self_signup = database.count_users() == 0
-        return render_template('login.html', register_error="Account creation is admin-only.", allow_self_signup=allow_self_signup)
+        return render_template(
+            'login.html',
+            register_error="Account creation is admin-only.",
+            allow_self_signup=allow_self_signup)
 
     success, msg, user_id = auth.register_user(username, password, email, role='admin')
     if success:
@@ -149,7 +156,7 @@ def api_scan():
             "balanced": {"workers": 50, "timeout": 0.2},
             "safe": {"workers": 20, "timeout": 0.5},
         }
-        
+
         profile_config = profiles.get(profile, profiles["balanced"])
         workers = profile_config["workers"]
         timeout = profile_config["timeout"]
@@ -157,13 +164,13 @@ def api_scan():
         open_ports = network_scanner.scan_range_concurrent(
             target, start, end, timeout, workers
         )
-        
+
         # Save to database
         scan_id = database.save_scan(target, start, end, open_ports, profile, workers, timeout)
-        
+
         # Enrich with port service names
         enriched_ports = port_services.enrich_scan_results(sorted(open_ports))
-        
+
         scan_result = {
             "id": scan_id,
             "target": target,
@@ -212,12 +219,12 @@ def api_analyze():
             })
             # Save IP intel to database
             database.save_ip_intel(ip, intel["reputation_score"], intel["threat_type"],
-                                  intel["abuse_reports"], intel["known_for_attacks"],
-                                  intel["confidence"], intel["last_reported"])
-        
+                                   intel["abuse_reports"], intel["known_for_attacks"],
+                                   intel["confidence"], intel["last_reported"])
+
         # Save analysis to database
         analysis_id = database.save_analysis(log_file, len(log_results), enriched)
-        
+
         analysis_result = {
             "id": analysis_id,
             "log_file": log_file,
@@ -254,7 +261,7 @@ def api_intel():
             risk_level = "🟡 MEDIUM"
         else:
             risk_level = "🟢 LOW"
-        
+
         return jsonify({
             "ip": ip,
             "risk_level": risk_level,
@@ -309,10 +316,10 @@ def api_export_scan(scan_id):
     format_type = request.args.get('format', 'json')  # json, csv, or html
     history = database.get_scan_history()
     scan = next((s for s in history if s['id'] == scan_id), None)
-    
+
     if not scan:
         return jsonify({"error": "Scan not found"}), 404
-    
+
     if format_type == 'csv':
         csv_data = export.export_scan_to_csv(scan)
         return csv_data, 200, {'Content-Disposition': f'attachment; filename=scan_{scan_id}.csv'}
@@ -321,7 +328,12 @@ def api_export_scan(scan_id):
         return html_data, 200, {'Content-Type': 'text/html'}
     else:  # json
         json_data = export.export_scan_to_json(scan)
-        return json_data, 200, {'Content-Disposition': f'attachment; filename=scan_{scan_id}.json', 'Content-Type': 'application/json'}
+        headers = {
+            'Content-Disposition':
+                f'attachment; filename=scan_{scan_id}.json',
+            'Content-Type': 'application/json'
+        }
+        return json_data, 200, headers
 
 
 @app.route('/api/export/analysis/<int:analysis_id>', methods=['GET'])
@@ -330,19 +342,25 @@ def api_export_analysis(analysis_id):
     format_type = request.args.get('format', 'json')  # json, csv, or html
     history = database.get_analysis_history()
     analysis = next((a for a in history if a['id'] == analysis_id), None)
-    
+
     if not analysis:
         return jsonify({"error": "Analysis not found"}), 404
-    
+
     if format_type == 'csv':
         csv_data = export.export_analysis_to_csv(analysis)
-        return csv_data, 200, {'Content-Disposition': f'attachment; filename=analysis_{analysis_id}.csv'}
+        return csv_data, 200, {
+            'Content-Disposition': f'attachment; filename=analysis_{analysis_id}.csv'}
     elif format_type == 'html':
         html_data = export.generate_html_report(analysis=analysis)
         return html_data, 200, {'Content-Type': 'text/html'}
     else:  # json
         json_data = export.export_analysis_to_json(analysis)
-        return json_data, 200, {'Content-Disposition': f'attachment; filename=analysis_{analysis_id}.json', 'Content-Type': 'application/json'}
+        headers = {
+            'Content-Disposition':
+                f'attachment; filename=analysis_{analysis_id}.json',
+            'Content-Type': 'application/json'
+        }
+        return json_data, 200, headers
 
 
 @app.route('/api/email/configure', methods=['POST'])
@@ -373,13 +391,13 @@ def api_email_alert():
         recipient = data.get('recipient')
         ip = data.get('ip')
         threat_type = data.get('threat_type')
-        
+
         if not all([recipient, ip, threat_type]):
             return jsonify({"error": "recipient, ip, and threat_type required"}), 400
-        
+
         intel = threat_intel.lookup_ip(ip)
         success = email_alerts.send_critical_threat_alert(recipient, ip, intel)
-        
+
         if success:
             return jsonify({"status": "alert_sent"})
         else:
@@ -402,18 +420,19 @@ def api_scan_url():
     try:
         data = request.json
         url = data.get('url')
-        
+
         if not url:
             return jsonify({"error": "URL required"}), 400
-        
+
         # Ensure URL has protocol
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
-        
+
         result = website_scanner.scan_url(url)
         result['threat_summary'] = website_scanner.get_threat_summary(result)
-        result['legitimacy_badge'] = website_scanner.get_legitimacy_badge(result['legitimacy_score'])
-        
+        result['legitimacy_badge'] = website_scanner.get_legitimacy_badge(
+            result['legitimacy_score'])
+
         # Save to database
         scan_id = database.save_website_scan(
             url=url,
@@ -425,7 +444,7 @@ def api_scan_url():
             ssl_valid=result.get('ssl_valid', False)
         )
         result['scan_id'] = scan_id
-        
+
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -437,18 +456,19 @@ def api_scan_urls():
     try:
         data = request.json
         urls = data.get('urls', [])
-        
+
         if not urls:
             return jsonify({"error": "URLs required"}), 400
-        
+
         results = []
         for url in urls:
             if not url.startswith(('http://', 'https://')):
                 url = 'https://' + url
             result = website_scanner.scan_url(url)
             result['threat_summary'] = website_scanner.get_threat_summary(result)
-            result['legitimacy_badge'] = website_scanner.get_legitimacy_badge(result['legitimacy_score'])
-            
+            result['legitimacy_badge'] = website_scanner.get_legitimacy_badge(
+                result['legitimacy_score'])
+
             # Save to database
             scan_id = database.save_website_scan(
                 url=url,
@@ -460,9 +480,9 @@ def api_scan_urls():
                 ssl_valid=result.get('ssl_valid', False)
             )
             result['scan_id'] = scan_id
-            
+
             results.append(result)
-        
+
         return jsonify({
             "total_scanned": len(results),
             "results": results,
@@ -510,13 +530,13 @@ def api_webhook_configure():
             "webhook_type": data.get('webhook_type', 'slack'),  # slack, discord, custom
             "enabled": data.get('enabled', True)
         }
-        
+
         # Save to webhook_config.json
         import json
         config_path = Path(__file__).parent.parent / "webhook_config.json"
         with open(config_path, 'w') as f:
             json.dump(webhook_config, f, indent=2)
-        
+
         return jsonify({"status": "configured"})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -581,7 +601,7 @@ def api_register():
             return jsonify({"status": "error", "message": "Account creation is admin-only"}), 403
 
         success, msg, user_id = auth.register_user(username, password, email, role='admin')
-        
+
         if success:
             session['user_id'] = user_id
             return jsonify({"status": "success", "user_id": user_id, "message": msg})
@@ -601,7 +621,7 @@ def api_login():
 
         mfa_code = data.get('mfa_code')
         success, msg, user_info, mfa_required = auth.login_user(username, password, mfa_code)
-        
+
         if success:
             session['user_id'] = user_info.get('id')
             return jsonify({"status": "success", "user": user_info})
@@ -789,28 +809,28 @@ def api_export_pdf():
         data = request.json
         scan_id = data.get('scan_id')
         analysis_id = data.get('analysis_id')
-        
+
         # Get data from database
         scan_data = None
         analysis_data = None
-        
+
         if scan_id:
             scans = database.get_scan_history(limit=1)
             scan_data = scans[0] if scans else None
-        
+
         if analysis_id:
             analyses = database.get_analysis_history(limit=1)
             analysis_data = analyses[0] if analyses else None
-        
+
         website_scans = database.get_website_scan_history(limit=10)
-        
+
         # Generate PDF
         report = pdf_export.export_report_to_pdf(scan_data, analysis_data, website_scans)
 
         if report.get('success'):
             pdf_bytes = report.get('data', b'')
             filename = report.get('filename', 'SecurityReport.pdf')
-            
+
             return send_file(
                 io.BytesIO(pdf_bytes),
                 mimetype=report.get('content_type', 'application/pdf'),
@@ -831,9 +851,9 @@ def api_assess_vulnerabilities():
     try:
         data = request.json
         ports = data.get('ports', [])
-        
+
         assessment = vulnerability_db.assess_scan_vulnerabilities(ports)
-        
+
         return jsonify(assessment)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -858,9 +878,9 @@ def api_remediation_report():
     try:
         data = request.json
         ports = data.get('ports', [])
-        
+
         report = vulnerability_db.generate_remediation_report(ports)
-        
+
         return jsonify(report)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -873,15 +893,15 @@ def api_send_test_webhook():
     """Send a test webhook alert."""
     try:
         data = request.json
-        
+
         test_threat = {
             "threat_type": data.get('threat_type', 'Test Alert'),
             "severity": data.get('severity', 'medium'),
             "details": data.get('details', 'This is a test webhook alert')
         }
-        
+
         result = webhooks.send_webhook_alert(test_threat)
-        
+
         return jsonify({
             "status": "sent" if result.get('sent') > 0 else "failed",
             "result": result
@@ -899,9 +919,9 @@ def api_import_logs():
         data = request.json
         directory = data.get('directory')
         pattern = data.get('pattern', '*.log')
-        
+
         result = bulk_import.bulk_import_logs(directory, pattern)
-        
+
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -915,9 +935,9 @@ def api_import_csv():
         csv_file = data.get('file_path')
         ip_column = data.get('ip_column', 'source_ip')
         threat_column = data.get('threat_column', 'threat_type')
-        
+
         result = bulk_import.import_csv_logs(csv_file, ip_column, threat_column)
-        
+
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -958,6 +978,7 @@ def api_execute_schedules():
 # ============================================================================
 # ADMIN PORTAL ROUTES
 # ============================================================================
+
 
 @app.route('/admin')
 def admin_dashboard():
@@ -1143,7 +1164,7 @@ def api_admin_get_threats():
 
         limit = int(request.args.get('limit', 50))
         threats = database.get_threat_logs(limit=limit)
-        
+
         # Calculate threat statistics
         severity_counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0}
         for threat in threats:
