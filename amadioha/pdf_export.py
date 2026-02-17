@@ -185,21 +185,9 @@ def generate_html_report(
         """
 
         results = scan_data.get('results', {})
-        html += f'<div class="metric"><div class="metric-label">Ports Scanned</div><div class="metric-value">{
-            results.get(
-                "total_ports_scanned",
-                0)}</div></div>'
-        html += f'<div class="metric"><div class="metric-label">Open Ports</div><div class="metric-value">{
-            results.get(
-                "total_open",
-                0)}</div></div>'
-        html += f'<div class="metric"><div class="metric-label">Closed Ports</div><div class="metric-value">{
-            results.get(
-                "total_ports_scanned",
-                0) -
-            results.get(
-                "total_open",
-                0)}</div></div>'
+        html += f'<div class="metric"><div class="metric-label">Ports Scanned</div><div class="metric-value">{results.get("total_ports_scanned", 0)}</div></div>'
+        html += f'<div class="metric"><div class="metric-label">Open Ports</div><div class="metric-value">{results.get("total_open", 0)}</div></div>'
+        html += f'<div class="metric"><div class="metric-label">Closed Ports</div><div class="metric-value">{results.get("total_ports_scanned", 0) - results.get("total_open", 0)}</div></div>'
 
         html += """</div>"""
 

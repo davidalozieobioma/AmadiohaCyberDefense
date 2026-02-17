@@ -124,9 +124,7 @@ def cmd_report(args):
                 fh.write("=== AMADIOHA SECURITY REPORT ===\n\n")
                 fh.write(f"Target: {args.target}\n")
                 fh.write(f"Log File: {args.log_file}\n")
-                fh.write(
-                    f"Report Generated: {
-                        __import__('datetime').datetime.now().isoformat()}\n\n")
+                fh.write(f"Report Generated: {__import__('datetime').datetime.now().isoformat()}\n\n")
 
                 fh.write("NETWORK SCAN RESULTS\n")
                 fh.write(f"Open Ports Found: {len(open_ports)}\n")
