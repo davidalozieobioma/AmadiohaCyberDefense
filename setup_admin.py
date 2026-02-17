@@ -2,16 +2,19 @@
 """Create initial admin account."""
 
 import sys
+
 sys.path.insert(0, '.')
 
-from amadioha import auth
+from amadioha import auth  # noqa: E402
 
 # Create admin account
 username = "admin"
 email = "davidalozieobioma@gmail.com"
 password = "Amadioha@2026#Security"
 
-success, msg, user_id = auth.register_user(username, password, email, role='admin')
+success, msg, user_id = auth.register_user(
+    username, password, email, role='admin'
+)
 
 if success:
     print("✅ Admin account created successfully!")
