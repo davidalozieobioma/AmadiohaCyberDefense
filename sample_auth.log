@@ -1,0 +1,16 @@
+Feb 16 10:15:23 server sshd[1234]: Invalid user admin from 192.168.1.100 port 54321
+Feb 16 10:15:45 server sshd[1235]: Failed password for root from 185.220.101.1 port 54322
+Feb 16 10:16:10 server sshd[1236]: Failed password for root from 185.220.101.1 port 54323
+Feb 16 10:16:35 server sshd[1237]: Failed password for root from 185.220.101.1 port 54324
+Feb 16 10:17:02 server sshd[1238]: Failed password for user from 203.0.113.45 port 54325
+Feb 16 10:17:28 server sshd[1239]: Failed password for root from 203.0.113.45 port 54326
+Feb 16 10:17:55 server sshd[1240]: Accepted publickey for admin from 192.168.1.50 port 54327
+Feb 16 10:18:21 server sshd[1241]: Failed password for root from 198.51.100.22 port 54328
+Feb 16 10:18:47 server sshd[1242]: Failed password for root from 185.220.101.1 port 54329
+Feb 16 10:19:13 server sshd[1243]: Failed password for postgres from 203.0.113.45 port 54330
+Feb 16 10:19:39 server sshd[1244]: Failed password for root from 198.51.100.22 port 54331
+Feb 16 10:20:05 server sshd[1245]: Failed password for root from 198.51.100.22 port 54332
+Feb 16 10:20:31 server sshd[1246]: Failed password for oracle from 203.0.113.45 port 54333
+Feb 16 10:21:02 server sshd[1247]: Failed password for root from 185.220.101.1 port 54334
+Feb 16 10:21:28 server sshd[1248]: Failed password for root from 203.0.113.45 port 54335
+Feb 16 10:22:01 server sshd[1249]: Connection closed by 192.168.1.100 [preauth]

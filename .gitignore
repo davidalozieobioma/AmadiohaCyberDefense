@@ -44,6 +44,7 @@ env/
 
 # Application files
 *.log
+!sample_auth.log
 scan_results*.txt
 profile_test.txt
 security_report.txt
