@@ -1,1 +1,1 @@
-web: gunicorn amadioha.web:app
+web: gunicorn -c gunicorn.conf.py amadioha.web:app
