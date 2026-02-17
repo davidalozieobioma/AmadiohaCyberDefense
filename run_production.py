@@ -9,7 +9,7 @@ if __name__ == '__main__':
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
+
     try:
         from waitress import serve
         print("=" * 60)
@@ -21,7 +21,7 @@ if __name__ == '__main__':
         print("🔒 Running in production mode")
         print("🛑 Press Ctrl+C to stop")
         print()
-        
+
         # Serve application with Waitress
         # threads=4 for handling concurrent requests
         # channel_timeout=60 for longer-running operations
