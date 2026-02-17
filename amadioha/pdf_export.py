@@ -164,7 +164,7 @@ def generate_html_report(
         <div class="summary-box">
             <h3>Target: {scan_data.get('target', 'N/A')}</h3>
             <p>Profile: <strong>{scan_data.get('profile', 'N/A')}</strong></p>
-            <p>Scan Range: <strong>{scan_data.get('port_range', {}).get('start', '?')}-{scan_data.get('port_range', {}).get('end', '?')}</strong></p>
+            <p>Scan Range: <strong>{scan_data.get('port_range', {}).get('start', '?')}-{scan_data.get('port_range', {}).get('end', '?')}</strong></p>  # noqa: E501
         </div>
 
         <h3>Open Ports Detected</h3>
