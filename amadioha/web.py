@@ -955,6 +955,178 @@ def api_execute_schedules():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+# ============================================================================
+# ADMIN PORTAL ROUTES
+# ============================================================================
+
+@app.route('/admin')
+def admin_dashboard():
+    """Admin control panel."""
+    current_user = get_current_user()
+    if not is_admin(current_user):
+        return redirect(url_for('dashboard'))
+    return render_template('admin.html', current_user=current_user)
+
+
+@app.route('/api/admin/stats', methods=['GET'])
+def api_admin_stats():
+    """Get system statistics for admin dashboard."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        # Get user statistics
+        all_users = database.get_all_users()
+        admin_count = sum(1 for u in all_users if u.get('role') == 'admin')
+        user_count = len(all_users)
+
+        # Get scan statistics
+        scan_count = len(results.get("scans", []))
+        analysis_count = len(results.get("analyses", []))
+
+        return jsonify({
+            "status": "success",
+            "total_users": user_count,
+            "admin_users": admin_count,
+            "regular_users": user_count - admin_count,
+            "total_scans": scan_count,
+            "total_analyses": analysis_count,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/users', methods=['GET'])
+def api_admin_get_users():
+    """Get all users (admin only)."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        users = database.get_all_users()
+        # Remove sensitive data
+        safe_users = [
+            {
+                "id": u.get('id'),
+                "username": u.get('username'),
+                "email": u.get('email'),
+                "role": u.get('role'),
+                "created_at": u.get('created_at'),
+                "mfa_enabled": bool(u.get('mfa_secret'))
+            }
+            for u in users
+        ]
+        return jsonify({"status": "success", "users": safe_users})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/users/<user_id>', methods=['DELETE'])
+def api_admin_delete_user(user_id):
+    """Delete a user (admin only)."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        # Prevent deleting self
+        if str(current_user.get('id')) == str(user_id):
+            return jsonify({"error": "Cannot delete yourself"}), 400
+
+        # Prevent deleting if only one admin left
+        all_users = database.get_all_users()
+        admin_users = [u for u in all_users if u.get('role') == 'admin']
+        target_user = database.get_user_by_id(user_id)
+
+        if len(admin_users) == 1 and target_user.get('role') == 'admin':
+            return jsonify({"error": "Cannot delete the last admin user"}), 400
+
+        database.delete_user(user_id)
+        return jsonify({"status": "success", "message": "User deleted"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/users/<user_id>/role', methods=['PUT'])
+def api_admin_update_user_role(user_id):
+    """Update user role (admin only)."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        data = request.json
+        new_role = data.get('role', 'user')
+
+        if new_role not in ['user', 'admin']:
+            return jsonify({"error": "Invalid role"}), 400
+
+        # Prevent removing all admins
+        all_users = database.get_all_users()
+        admin_users = [u for u in all_users if u.get('role') == 'admin']
+        target_user = database.get_user_by_id(user_id)
+
+        if new_role == 'user' and len(admin_users) == 1 and target_user.get('role') == 'admin':
+            return jsonify({"error": "Cannot remove the last admin role"}), 400
+
+        database.update_user_role(user_id, new_role)
+        return jsonify({"status": "success", "message": f"User role updated to {new_role}"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/audit-log', methods=['GET'])
+def api_admin_audit_log():
+    """Get audit log (admin only)."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        limit = int(request.args.get('limit', 50))
+        logs = database.get_audit_logs(limit=limit)
+
+        return jsonify({
+            "status": "success",
+            "logs": logs,
+            "count": len(logs)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/settings', methods=['GET'])
+def api_admin_get_settings():
+    """Get system settings (admin only)."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        settings = database.get_settings()
+        return jsonify({"status": "success", "settings": settings})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/settings', methods=['PUT'])
+def api_admin_update_settings():
+    """Update system settings (admin only)."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        data = request.json
+        for key, value in data.items():
+            database.update_setting(key, value)
+
+        return jsonify({"status": "success", "message": "Settings updated"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 @app.route('/health', methods=['GET'])
 def health():

@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Amadioha Cyber Defense</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .sidebar {
+            background: #2d3748;
+            color: white;
+            min-height: 100vh;
+            padding: 20px 0;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 250px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+        .sidebar h4 {
+            padding: 20px;
+            border-bottom: 2px solid #667eea;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .sidebar a {
+            color: #e2e8f0;
+            text-decoration: none;
+            display: block;
+            padding: 12px 20px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .sidebar a:hover {
+            background: #667eea;
+            border-left-color: #667eea;
+            padding-left: 30px;
+        }
+        .sidebar a.active {
+            background: #667eea;
+            border-left-color: #ffd700;
+            font-weight: bold;
+        }
+        .main-content {
+            margin-left: 250px;
+            padding: 30px;
+        }
+        .card {
+            background: white;
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px 10px 0 0 !important;
+            padding: 15px 20px;
+            font-weight: bold;
+            border: none;
+        }
+        .stat-box {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .stat-box h3 {
+            font-size: 2.5em;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .stat-box p {
+            margin: 0;
+            opacity: 0.9;
+        }
+        .table-responsive {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        table tbody tr:hover {
+            background: #f5f5f5;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+        .badge-admin {
+            background: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+        }
+        .badge-user {
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+        }
+        .top-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .alert-custom {
+            border-radius: 10px;
+            border: none;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .tab-nav {
+            display: flex;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 20px;
+        }
+        .tab-nav button {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            color: #667eea;
+            font-weight: bold;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .tab-nav button.active {
+            border-bottom-color: #667eea;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h4>🛡️ ADMIN PANEL</h4>
+        <a href="/admin" class="nav-link active" data-tab="dashboard">📊 Dashboard</a>
+        <a href="#" class="nav-link" data-tab="users">👥 User Management</a>
+        <a href="#" class="nav-link" data-tab="audit">📋 Audit Log</a>
+        <a href="#" class="nav-link" data-tab="settings">⚙️ Settings</a>
+        <hr style="border-color: #667eea; margin: 20px 0;">
+        <a href="/" style="color: #ffd700;"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+        <a href="/logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div>
+                <h2>🛡️ Amadioha Admin Portal</h2>
+                <p class="mb-0" style="color: #999;">System Administration & Control</p>
+            </div>
+            <div style="text-align: right;">
+                <p style="margin: 0; color: #999;">Welcome, <strong>{{ current_user.username }}</strong></p>
+                <small style="color: #999;">Last updated: <span id="last-updated">now</span></small>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div id="alert-container"></div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <h3 style="margin-bottom: 20px;">System Overview</h3>
+            
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="stat-box">
+                        <i class="fas fa-users" style="font-size: 2em;"></i>
+                        <h3 id="total-users">0</h3>
+                        <p>Total Users</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-box">
+                        <i class="fas fa-crown" style="font-size: 2em;"></i>
+                        <h3 id="admin-count">0</h3>
+                        <p>Admins</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-box">
+                        <i class="fas fa-network-wired" style="font-size: 2em;"></i>
+                        <h3 id="scan-count">0</h3>
+                        <p>Total Scans</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-box">
+                        <i class="fas fa-file-alt" style="font-size: 2em;"></i>
+                        <h3 id="analysis-count">0</h3>
+                        <p>Analyses</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Quick Actions</div>
+                <div class="card-body">
+                    <button class="btn btn-primary me-2" onclick="switchTab('users')">
+                        <i class="fas fa-user-plus"></i> Manage Users
+                    </button>
+                    <button class="btn btn-primary me-2" onclick="switchTab('audit')">
+                        <i class="fas fa-history"></i> View Audit Log
+                    </button>
+                    <button class="btn btn-primary" onclick="switchTab('settings')">
+                        <i class="fas fa-cog"></i> Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Management Tab -->
+        <div id="users" class="tab-content">
+            <h3 style="margin-bottom: 20px;">User Management</h3>
+            
+            <div class="card">
+                <div class="card-header">👥 All Users</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>MFA</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table">
+                                <tr>
+                                    <td colspan="6" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">➕ Create New User</div>
+                <div class="card-body">
+                    <form id="create-user-form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label>Username</label>
+                                    <input type="text" class="form-control" id="new-username" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label>Email</label>
+                                    <input type="email" class="form-control" id="new-email" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label>Password</label>
+                                    <input type="password" class="form-control" id="new-password" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label>Role</label>
+                                    <select class="form-select" id="new-role">
+                                        <option value="user">User</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-check"></i> Create User
+                        </button>
+                    </form>
+                    <div id="create-user-status" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audit Log Tab -->
+        <div id="audit" class="tab-content">
+            <h3 style="margin-bottom: 20px;">Audit Log</h3>
+            
+            <div class="card">
+                <div class="card-header">📋 Activity Log</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-table">
+                                <tr>
+                                    <td colspan="4" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <h3 style="margin-bottom: 20px;">System Settings</h3>
+            
+            <div class="card">
+                <div class="card-header">⚙️ Configuration</div>
+                <div class="card-body">
+                    <form id="settings-form">
+                        <div class="mb-3">
+                            <label>Max Concurrent Scans</label>
+                            <input type="number" class="form-control" id="setting-max-scans" value="5" min="1" max="100">
+                        </div>
+                        <div class="mb-3">
+                            <label>Session Timeout (minutes)</label>
+                            <input type="number" class="form-control" id="setting-session-timeout" value="120" min="15">
+                        </div>
+                        <div class="mb-3">
+                            <label>Enable Logging</label>
+                            <select class="form-select" id="setting-logging">
+                                <option value="enabled">Enabled</option>
+                                <option value="disabled">Disabled</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label>Require MFA for Admins</label>
+                            <select class="form-select" id="setting-mfa-required">
+                                <option value="true">Yes</option>
+                                <option value="false">No</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Settings
+                        </button>
+                    </form>
+                    <div id="settings-status" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = '/api/admin';
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+
+            document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+
+            if (tabName === 'users') loadUsers();
+            if (tabName === 'audit') loadAuditLog();
+            if (tabName === 'dashboard') loadStats();
+        }
+
+        // Sidebar navigation
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                const tab = e.currentTarget.getAttribute('data-tab');
+                if (tab) {
+                    e.preventDefault();
+                    switchTab(tab);
+                }
+            });
+        });
+
+        // Alert helper
+        function showAlert(message, type = 'success') {
+            const alertHtml = `
+                <div class="alert alert-${type} alert-custom alert-dismissible fade show" role="alert">
+                    <strong>${type === 'success' ? '✓' : '✕'}</strong> ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            document.getElementById('alert-container').innerHTML = alertHtml;
+        }
+
+        // Load statistics
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/stats`);
+                const data = await response.json();
+                
+                document.getElementById('total-users').textContent = data.total_users;
+                document.getElementById('admin-count').textContent = data.admin_users;
+                document.getElementById('scan-count').textContent = data.total_scans;
+                document.getElementById('analysis-count').textContent = data.total_analyses;
+                document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load users
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/users`);
+                const data = await response.json();
+                
+                let html = '';
+                data.users.forEach(user => {
+                    const badge = user.role === 'admin' ? 
+                        '<span class="badge-admin">ADMIN</span>' : 
+                        '<span class="badge-user">USER</span>';
+                    const mfa = user.mfa_enabled ? '✓ Enabled' : '✗ Disabled';
+                    
+                    html += `
+                        <tr>
+                            <td><strong>${user.username}</strong></td>
+                            <td>${user.email}</td>
+                            <td>${badge}</td>
+                            <td>${mfa}</td>
+                            <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                            <td>
+                                <button class="btn btn-sm btn-warning" onclick="toggleUserRole('${user.id}', '${user.role}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                ${user.id !== '{{ current_user.id }}' ? `
+                                    <button class="btn btn-sm btn-danger" onclick="deleteUser('${user.id}', '${user.username}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                ` : ''}
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                document.getElementById('users-table').innerHTML = html || '<tr><td colspan="6" class="text-center">No users found</td></tr>';
+            } catch (error) {
+                console.error('Error loading users:', error);
+                showAlert('Failed to load users', 'danger');
+            }
+        }
+
+        // Toggle user role
+        async function toggleUserRole(userId, currentRole) {
+            const newRole = currentRole === 'admin' ? 'user' : 'admin';
+            if (!confirm(`Change user role to ${newRole.toUpperCase()}?`)) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/users/${userId}/role`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: newRole })
+                });
+                
+                if (response.ok) {
+                    showAlert(`User role updated to ${newRole}`);
+                    loadUsers();
+                } else {
+                    showAlert('Failed to update user role', 'danger');
+                }
+            } catch (error) {
+                console.error('Error updating role:', error);
+                showAlert('Error updating user role', 'danger');
+            }
+        }
+
+        // Delete user
+        async function deleteUser(userId, username) {
+            if (!confirm(`Are you sure you want to delete ${username}? This action cannot be undone.`)) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/users/${userId}`, { method: 'DELETE' });
+                
+                if (response.ok) {
+                    showAlert(`User ${username} deleted`);
+                    loadUsers();
+                } else {
+                    const data = await response.json();
+                    showAlert(data.error || 'Failed to delete user', 'danger');
+                }
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                showAlert('Error deleting user', 'danger');
+            }
+        }
+
+        // Create user form
+        document.getElementById('create-user-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                username: document.getElementById('new-username').value,
+                email: document.getElementById('new-email').value,
+                password: document.getElementById('new-password').value,
+                role: document.getElementById('new-role').value
+            };
+
+            try {
+                const response = await fetch('/api/admin/create-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                if (response.ok) {
+                    showAlert('User created successfully');
+                    document.getElementById('create-user-form').reset();
+                    loadUsers();
+                } else {
+                    const data = await response.json();
+                    showAlert(data.message || 'Failed to create user', 'danger');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Error creating user', 'danger');
+            }
+        });
+
+        // Load audit log
+        async function loadAuditLog() {
+            try {
+                const response = await fetch(`${API_BASE}/audit-log`);
+                const data = await response.json();
+                
+                let html = '';
+                data.logs.forEach(log => {
+                    html += `
+                        <tr>
+                            <td>${new Date(log.timestamp).toLocaleString()}</td>
+                            <td>${log.user || 'System'}</td>
+                            <td><strong>${log.action}</strong></td>
+                            <td>${log.details || '-'}</td>
+                        </tr>
+                    `;
+                });
+                
+                document.getElementById('audit-table').innerHTML = html || '<tr><td colspan="4" class="text-center">No logs found</td></tr>';
+            } catch (error) {
+                console.error('Error loading audit log:', error);
+                showAlert('Failed to load audit log', 'danger');
+            }
+        }
+
+        // Settings form
+        document.getElementById('settings-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const settings = {
+                max_concurrent_scans: document.getElementById('setting-max-scans').value,
+                session_timeout: document.getElementById('setting-session-timeout').value,
+                logging: document.getElementById('setting-logging').value,
+                mfa_required: document.getElementById('setting-mfa-required').value === 'true'
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+
+                if (response.ok) {
+                    showAlert('Settings saved successfully');
+                } else {
+                    showAlert('Failed to save settings', 'danger');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Error saving settings', 'danger');
+            }
+        });
+
+        // Initial load
+        loadStats();
+        setInterval(loadStats, 30000); // Refresh stats every 30 seconds
+    </script>
+</body>
+</html>
