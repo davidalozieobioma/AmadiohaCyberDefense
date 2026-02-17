@@ -13,7 +13,6 @@ if __name__ == '__main__':
     print("📱 Dashboard: http://localhost:5000")
     print("🛑 Press Ctrl+C to stop the server")
     print()
-    
     try:
         run_server(host='127.0.0.1', port=5000, debug=True)
     except KeyboardInterrupt:

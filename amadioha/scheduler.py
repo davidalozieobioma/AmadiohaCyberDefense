@@ -36,8 +36,7 @@ class ScanScheduler:
         last_run = schedule.get('last_run')
         frequency = schedule.get('frequency', 'daily')
 
-        from datetime import datetime, timedelta
-
+        from datetime import datetime
         if not last_run:
             return True
 

@@ -2,11 +2,13 @@
 """Verify app is working correctly."""
 
 import sys
-sys.path.insert(0, '.')
-
-from amadioha import database
 import sqlite3
-from amadioha.database import DB_PATH
+import os
+
+sys.path.insert(0, '.')  # noqa: E402
+
+from amadioha import database  # noqa: E402
+from amadioha.database import DB_PATH  # noqa: E402
 
 # Initialize database
 database.init_db()
@@ -19,9 +21,9 @@ print("=" * 60)
 user_count = database.count_users()
 users = database.get_all_users()
 
-print(f"\n✅ Database Status: Connected")
+print("\n✅ Database Status: Connected")
 print(f"✅ Total Users: {user_count}")
-print(f"\n📋 Users List:")
+print("\n📋 Users List:")
 for user in users:
     print(f"   • {user['username']} ({user['email']})")
     print(f"     └─ Role: {user['role']}")
@@ -36,10 +38,6 @@ conn.close()
 print(f"\n✅ Database Tables: {len(tables)} found")
 for table in tables:
     print(f"   ✓ {table}")
-
-# Check key files exist
-import os
-from pathlib import Path
 
 print("\n✅ Project Files:")
 key_files = [

@@ -304,8 +304,6 @@ def generate_pdf_from_html(html_content: str, filename: str = None) -> bytes:
     """
     try:
         from weasyprint import HTML
-        import io
-
         pdf_bytes = HTML(string=html_content).write_pdf()
         return pdf_bytes
     except ImportError:
