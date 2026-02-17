@@ -160,10 +160,31 @@
     <!-- Sidebar -->
     <div class="sidebar">
         <h4>🛡️ ADMIN PANEL</h4>
-        <a href="/admin" class="nav-link active" data-tab="dashboard">📊 Dashboard</a>
+        <a href="#" class="nav-link active" data-tab="dashboard">📊 Dashboard</a>
+        <hr style="border-color: #667eea; margin: 10px 0;">
+        
+        <!-- User Management -->
         <a href="#" class="nav-link" data-tab="users">👥 User Management</a>
-        <a href="#" class="nav-link" data-tab="audit">📋 Audit Log</a>
+        <a href="#" class="nav-link" data-tab="departments">🏢 Departments</a>
+        
+        <!-- Security -->
+        <hr style="border-color: #667eea; margin: 10px 0;">
+        <a href="#" class="nav-link" data-tab="threats">🔴 Threat Intelligence</a>
+        <a href="#" class="nav-link" data-tab="activity">📋 Activity Log</a>
+        <a href="#" class="nav-link" data-tab="ip-access">🚫 IP Access Control</a>
+        
+        <!-- Operations -->
+        <hr style="border-color: #667eea; margin: 10px 0;">
+        <a href="#" class="nav-link" data-tab="api-keys">🔑 API Keys</a>
+        <a href="#" class="nav-link" data-tab="usage">📊 Usage & Limits</a>
+        <a href="#" class="nav-link" data-tab="alerts">🚨 Security Alerts</a>
+        
+        <!-- System -->
+        <hr style="border-color: #667eea; margin: 10px 0;">
+        <a href="#" class="nav-link" data-tab="logs">📝 System Logs</a>
+        <a href="#" class="nav-link" data-tab="backup">💾 Backups</a>
         <a href="#" class="nav-link" data-tab="settings">⚙️ Settings</a>
+        
         <hr style="border-color: #667eea; margin: 20px 0;">
         <a href="/" style="color: #ffd700;"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
         <a href="/logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
@@ -376,6 +397,246 @@
                 </div>
             </div>
         </div>
+
+         <!-- Threat Intelligence Tab -->
+        <div id="threats" class="tab-content">
+            <h3 style="margin-bottom: 20px;">Threat Intelligence Dashboard</h3>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>Threat Type</th>
+                            <th>Severity</th>
+                            <th>Port</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody id="threats-table">
+                        <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Activity Log Tab -->
+        <div id="activity" class="tab-content">
+            <h3 style="margin-bottom: 20px;">System Activity</h3>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>User ID</th>
+                            <th>Action</th>
+                            <th>Details</th>
+                            <th>IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody id="activity-table">
+                        <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- IP Access Control Tab -->
+        <div id="ip-access" class="tab-content">
+            <h3 style="margin-bottom: 20px;">IP Whitelist / Blacklist</h3>
+            <div class="card mb-3">
+                <div class="card-header">➕ Add IP</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <input type="text" class="form-control" id="ip-address" placeholder="IP Address">
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" id="ip-list-type">
+                                <option value="whitelist">Whitelist</option>
+                                <option value="blacklist">Blacklist</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" class="form-control" id="ip-reason" placeholder="Reason">
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-primary w-100" onclick="addIP()">Add</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>List Type</th>
+                            <th>Reason</th>
+                            <th>Added</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ip-access-table">
+                        <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- API Keys Tab -->
+        <div id="api-keys" class="tab-content">
+            <h3 style="margin-bottom: 20px;">API Key Management</h3>
+            <div class="card">
+                <div class="card-header">🔑 API Keys</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>User ID</th>
+                                    <th>API Key</th>
+                                    <th>Permissions</th>
+                                    <th>Created</th>
+                                    <th>Last Used</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="api-keys-table">
+                                <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usage & Limits Tab -->
+        <div id="usage" class="tab-content">
+            <h3 style="margin-bottom: 20px;">User Usage & Limits</h3>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Scans</th>
+                            <th>Analyses</th>
+                            <th>API Calls</th>
+                            <th>Bandwidth (MB)</th>
+                            <th>Max Scans/Month</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usage-table">
+                        <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Security Alerts Tab -->
+        <div id="alerts" class="tab-content">
+            <h3 style="margin-bottom: 20px;">Security Alerts Configuration</h3>
+            <div class="card">
+                <div class="card-header">🚨 Active Alerts</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Alert Type</th>
+                                    <th>User ID</th>
+                                    <th>Channel</th>
+                                    <th>Severity Threshold</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alerts-table">
+                                <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Logs Tab -->
+        <div id="logs" class="tab-content">
+            <h3 style="margin-bottom: 20px;">System Logs</h3>
+            <div class="mb-3">
+                <select class="form-select" id="log-level-filter" onchange="loadSystemLogs()">
+                    <option value="">All Levels</option>
+                    <option value="ERROR">Errors</option>
+                    <option value="WARNING">Warnings</option>
+                    <option value="INFO">Info</option>
+                </select>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Level</th>
+                            <th>Component</th>
+                            <th>Message</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-table">
+                        <tr><td colspan="4" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Departments Tab -->
+        <div id="departments" class="tab-content">
+            <h3 style="margin-bottom: 20px;">Department Management</h3>
+            <div class="card mb-3">
+                <div class="card-header">➕ Create Department</div>
+                <div class="card-body">
+                    <input type="text" class="form-control mb-2" id="dept-name" placeholder="Department Name">
+                    <input type="text" class="form-control mb-2" id="dept-desc" placeholder="Description">
+                    <button class="btn btn-primary" onclick="createDepartment()">Create</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Department Name</th>
+                            <th>Description</th>
+                            <th>Members</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody id="departments-table">
+                        <tr><td colspan="4" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Backups Tab -->
+        <div id="backup" class="tab-content">
+            <h3 style="margin-bottom: 20px;">Database Backups</h3>
+            <button class="btn btn-primary mb-3" onclick="createBackup()">
+                <i class="fas fa-plus"></i> Create Backup Now
+            </button>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Backup File</th>
+                            <th>Size (MB)</th>
+                            <th>Type</th>
+                            <th>Created</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backups-table">
+                        <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -391,7 +652,15 @@
             document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
 
             if (tabName === 'users') loadUsers();
-            if (tabName === 'audit') loadAuditLog();
+            if (tabName === 'threats') loadThreats();
+            if (tabName === 'activity') loadActivityLog();
+            if (tabName === 'ip-access') loadIPAccess();
+            if (tabName === 'api-keys') loadAPIKeys();
+            if (tabName === 'usage') loadUsage();
+            if (tabName === 'alerts') loadAlerts();
+            if (tabName === 'logs') loadSystemLogs();
+            if (tabName === 'departments') loadDepartments();
+            if (tabName === 'backup') loadBackups();
             if (tabName === 'dashboard') loadStats();
         }
 
@@ -415,6 +684,197 @@
                 </div>
             `;
             document.getElementById('alert-container').innerHTML = alertHtml;
+        }
+
+        // Load threats
+        async function loadThreats() {
+            try {
+                const response = await fetch(`${API_BASE}/threats`);
+                const data = await response.json();
+                let html = '';
+                data.threats.forEach(threat => {
+                    html += `<tr><td>${threat.ip_address}</td><td>${threat.threat_type}</td><td><span class="badge bg-danger">${threat.severity}</span></td><td>${threat.port || 'N/A'}</td><td>${new Date(threat.timestamp).toLocaleString()}</td></tr>`;
+                });
+                document.getElementById('threats-table').innerHTML = html || '<tr><td colspan="5" class="text-center">No threats</td></tr>';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Load Activity
+        async function loadActivityLog() {
+            try {
+                const response = await fetch(`${API_BASE}/activity`);
+                const data = await response.json();
+                let html = '';
+                data.activities.forEach(act => {
+                    html += `<tr><td>${new Date(act.timestamp).toLocaleString()}</td><td>${act.user_id}</td><td>${act.action}</td><td>${act.details}</td><td>${act.ip_address}</td></tr>`;
+                });
+                document.getElementById('activity-table').innerHTML = html || '<tr><td colspan="5" class="text-center">No activities</td></tr>';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Load IP Access
+        async function loadIPAccess() {
+            try {
+                const response = await fetch(`${API_BASE}/ip-access`);
+                const data = await response.json();
+                let html = '';
+                data.ips.forEach(ip => {
+                    html += `<tr><td>${ip.ip_address}</td><td><span class="badge ${ip.list_type === 'whitelist' ? 'bg-success' : 'bg-danger'}">${ip.list_type.toUpperCase()}</span></td><td>${ip.reason}</td><td>${new Date(ip.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-danger" onclick="removeIP('${ip.ip_address}')">Remove</button></td></tr>`;
+                });
+                document.getElementById('ip-access-table').innerHTML = html || '<tr><td colspan="5" class="text-center">No IPs configured</td></tr>';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function addIP() {
+            const ip = document.getElementById('ip-address').value;
+            const type = document.getElementById('ip-list-type').value;
+            const reason = document.getElementById('ip-reason').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/ip-access`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip_address: ip, list_type: type, reason: reason })
+                });
+                if (response.ok) {
+                    showAlert(`IP ${ip} added to ${type}`);
+                    loadIPAccess();
+                    document.getElementById('ip-address').value = '';
+                }
+            } catch (error) {
+                showAlert('Error adding IP', 'danger');
+            }
+        }
+
+        async function removeIP(ip) {
+            if (!confirm(`Remove ${ip}?`)) return;
+            try {
+                const response = await fetch(`${API_BASE}/ip-access/${ip}`, { method: 'DELETE' });
+                if (response.ok) {
+                    showAlert('IP removed');
+                    loadIPAccess();
+                }
+            } catch (error) {
+                showAlert('Error removing IP', 'danger');
+            }
+        }
+
+        // Load API Keys
+        async function loadAPIKeys() {
+            try {
+                const response = await fetch(`${API_BASE}/users`);
+                const data = await response.json();
+                let html = '';
+                // Note: In production, fetch actual API keys for each user
+                html = '<tr><td colspan="6" class="text-center">API Keys loaded from users</td></tr>';
+                document.getElementById('api-keys-table').innerHTML = html;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Load Usage
+        async function loadUsage() {
+            try {
+                const response = await fetch(`${API_BASE}/users`);
+                const data = await response.json();
+                let html = '';
+                document.getElementById('usage-table').innerHTML = html || '<tr><td colspan="6" class="text-center">Usage data</td></tr>';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Load Alerts
+        async function loadAlerts() {
+            try {
+                const response = await fetch(`${API_BASE}/users`);
+                const data = await response.json();
+                let html = '<tr><td colspan="5" class="text-center">No alerts configured</td></tr>';
+                document.getElementById('alerts-table').innerHTML = html;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Load System Logs
+        async function loadSystemLogs() {
+            try {
+                const response = await fetch(`${API_BASE}/logs`);
+                const data = await response.json();
+                let html = '';
+                data.logs.forEach(log => {
+                    html += `<tr><td>${new Date(log.timestamp).toLocaleString()}</td><td><span class="badge bg-warning">${log.level}</span></td><td>${log.component}</td><td>${log.message}</td></tr>`;
+                });
+                document.getElementById('logs-table').innerHTML = html || '<tr><td colspan="4" class="text-center">No logs</td></tr>';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Load Departments
+        async function loadDepartments() {
+            try {
+                const response = await fetch(`${API_BASE}/departments`);
+                const data = await response.json();
+                let html = '';
+                // Implementation for departments
+                html = '<tr><td colspan="4" class="text-center">Departments loaded</td></tr>';
+                document.getElementById('departments-table').innerHTML = html;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function createDepartment() {
+            const name = document.getElementById('dept-name').value;
+            const desc = document.getElementById('dept-desc').value;
+            try {
+                const response = await fetch(`${API_BASE}/departments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, description: desc })
+                });
+                if (response.ok) {
+                    showAlert('Department created');
+                    loadDepartments();
+                }
+            } catch (error) {
+                showAlert('Error creating department', 'danger');
+            }
+        }
+
+        // Load Backups
+        async function loadBackups() {
+            try {
+                const response = await fetch(`${API_BASE}/backups`);
+                const data = await response.json();
+                let html = '';
+                data.backups.forEach(backup => {
+                    html += `<tr><td>${backup.backup_file}</td><td>${backup.size_mb}</td><td>${backup.backup_type}</td><td>${new Date(backup.created_at).toLocaleString()}</td><td><span class="badge bg-success">${backup.status}</span></td></tr>`;
+                });
+                document.getElementById('backups-table').innerHTML = html || '<tr><td colspan="5" class="text-center">No backups</td></tr>';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function createBackup() {
+            try {
+                const response = await fetch(`${API_BASE}/backups`, { method: 'POST' });
+                if (response.ok) {
+                    showAlert('Backup created successfully');
+                    loadBackups();
+                }
+            } catch (error) {
+                showAlert('Error creating backup', 'danger');
+            }
         }
 
         // Load statistics

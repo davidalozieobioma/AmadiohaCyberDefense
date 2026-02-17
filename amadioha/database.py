@@ -148,6 +148,177 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN mfa_enabled BOOLEAN DEFAULT 0")
     if "mfa_updated" not in existing_cols:
         cursor.execute("ALTER TABLE users ADD COLUMN mfa_updated DATETIME")
+
+    # Activity logs table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS activity_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            action TEXT NOT NULL,
+            details TEXT,
+            ip_address TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+
+    # Threat logs table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS threat_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            threat_type TEXT,
+            ip_address TEXT,
+            severity TEXT,
+            port INTEGER,
+            scan_id INTEGER,
+            details TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # IP whitelist/blacklist table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ip_access_control (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip_address TEXT NOT NULL,
+            list_type TEXT NOT NULL,
+            reason TEXT,
+            added_by INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME,
+            FOREIGN KEY(added_by) REFERENCES users(id)
+        )
+    """)
+
+    # API keys table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            api_key TEXT UNIQUE NOT NULL,
+            name TEXT,
+            permissions TEXT,
+            last_used DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+
+    # Custom roles table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS custom_roles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            permissions TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # User role assignments table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_roles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            role_id INTEGER NOT NULL,
+            assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(role_id) REFERENCES custom_roles(id)
+        )
+    """)
+
+    # Usage tracking table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usage_tracking (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            scans_count INTEGER DEFAULT 0,
+            analyses_count INTEGER DEFAULT 0,
+            api_calls INTEGER DEFAULT 0,
+            bandwidth_mb REAL DEFAULT 0,
+            month_year TEXT,
+            reset_date DATETIME,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+
+    # System logs table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS system_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            level TEXT,
+            message TEXT,
+            component TEXT,
+            traceback TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Department/teams table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS departments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Team members table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS team_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            department_id INTEGER NOT NULL,
+            role TEXT,
+            joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(department_id) REFERENCES departments(id)
+        )
+    """)
+
+    # Backup records table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS backup_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            backup_file TEXT,
+            size_mb REAL,
+            backup_type TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME,
+            status TEXT DEFAULT 'completed'
+        )
+    """)
+
+    # Security alerts configuration table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS security_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            alert_type TEXT,
+            user_id INTEGER,
+            channel TEXT,
+            contact_info TEXT,
+            enabled BOOLEAN DEFAULT 1,
+            severity_threshold TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+
+    # Usage limits table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usage_limits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            max_concurrent_scans INTEGER DEFAULT 5,
+            max_monthly_scans INTEGER DEFAULT 100,
+            max_api_calls_per_hour INTEGER DEFAULT 100,
+            bandwidth_limit_mb INTEGER DEFAULT 5000,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
     
     conn.commit()
     conn.close()
@@ -656,6 +827,489 @@ def get_audit_logs(limit: int = 50) -> List[Dict]:
             "details": "Admin dashboard view"
         }
     ] * min(limit, 5)  # Placeholder
+
+
+# ============================================================================
+# ACTIVITY LOGGING
+# ============================================================================
+
+def log_activity(user_id: int, action: str, details: str = "", ip_address: str = "") -> int:
+    """Log user activity."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO activity_logs (user_id, action, details, ip_address)
+        VALUES (?, ?, ?, ?)
+    """, (user_id, action, details, ip_address))
+
+    conn.commit()
+    log_id = cursor.lastrowid
+    conn.close()
+    return log_id
+
+
+def get_activity_logs(limit: int = 100) -> List[Dict]:
+    """Get activity logs."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, user_id, action, details, ip_address, timestamp
+        FROM activity_logs
+        ORDER BY timestamp DESC
+        LIMIT ?
+    """, (limit,))
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+# ============================================================================
+# THREAT LOGS
+# ============================================================================
+
+def log_threat(threat_type: str, ip_address: str, severity: str, port: int = None, 
+               scan_id: int = None, details: str = "") -> int:
+    """Log a threat detection."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO threat_logs (threat_type, ip_address, severity, port, scan_id, details)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (threat_type, ip_address, severity, port, scan_id, details))
+
+    conn.commit()
+    log_id = cursor.lastrowid
+    conn.close()
+    return log_id
+
+
+def get_threat_logs(limit: int = 100, severity: str = None) -> List[Dict]:
+    """Get threat logs, optionally filtered by severity."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    if severity:
+        cursor.execute("""
+            SELECT id, threat_type, ip_address, severity, port, scan_id, details, timestamp
+            FROM threat_logs
+            WHERE severity = ?
+            ORDER BY timestamp DESC
+            LIMIT ?
+        """, (severity, limit))
+    else:
+        cursor.execute("""
+            SELECT id, threat_type, ip_address, severity, port, scan_id, details, timestamp
+            FROM threat_logs
+            ORDER BY timestamp DESC
+            LIMIT ?
+        """, (limit,))
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+# ============================================================================
+# IP ACCESS CONTROL (WHITELIST/BLACKLIST)
+# ============================================================================
+
+def add_ip_to_list(ip_address: str, list_type: str, reason: str = "", added_by: int = None) -> int:
+    """Add IP to whitelist or blacklist."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO ip_access_control (ip_address, list_type, reason, added_by)
+        VALUES (?, ?, ?, ?)
+    """, (ip_address, list_type, reason, added_by))
+
+    conn.commit()
+    record_id = cursor.lastrowid
+    conn.close()
+    return record_id
+
+
+def remove_ip_from_list(ip_address: str) -> bool:
+    """Remove IP from access control lists."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM ip_access_control WHERE ip_address = ?", (ip_address,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def get_ip_access_list(list_type: str = None) -> List[Dict]:
+    """Get IPs in whitelist/blacklist."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    if list_type:
+        cursor.execute("""
+            SELECT id, ip_address, list_type, reason, added_by, created_at
+            FROM ip_access_control
+            WHERE list_type = ?
+            ORDER BY created_at DESC
+        """, (list_type,))
+    else:
+        cursor.execute("""
+            SELECT id, ip_address, list_type, reason, added_by, created_at
+            FROM ip_access_control
+            ORDER BY created_at DESC
+        """)
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+# ============================================================================
+# API KEY MANAGEMENT
+# ============================================================================
+
+def create_api_key(user_id: int, name: str, permissions: str) -> str:
+    """Create API key for user."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    api_key = secrets.token_urlsafe(32)
+    cursor.execute("""
+        INSERT INTO api_keys (user_id, api_key, name, permissions)
+        VALUES (?, ?, ?, ?)
+    """, (user_id, api_key, name, permissions))
+
+    conn.commit()
+    conn.close()
+    return api_key
+
+
+def get_user_api_keys(user_id: int) -> List[Dict]:
+    """Get API keys for a user."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, api_key, name, permissions, last_used, created_at, expires_at
+        FROM api_keys
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+    """, (user_id,))
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def revoke_api_key(api_key_id: int) -> bool:
+    """Revoke an API key."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM api_keys WHERE id = ?", (api_key_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ============================================================================
+# SYSTEM LOGS
+# ============================================================================
+
+def log_system_event(level: str, message: str, component: str = "", traceback: str = "") -> int:
+    """Log system event."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO system_logs (level, message, component, traceback)
+        VALUES (?, ?, ?, ?)
+    """, (level, message, component, traceback))
+
+    conn.commit()
+    log_id = cursor.lastrowid
+    conn.close()
+    return log_id
+
+
+def get_system_logs(limit: int = 100, level: str = None) -> List[Dict]:
+    """Get system logs."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    if level:
+        cursor.execute("""
+            SELECT id, level, message, component, traceback, timestamp
+            FROM system_logs
+            WHERE level = ?
+            ORDER BY timestamp DESC
+            LIMIT ?
+        """, (level, limit))
+    else:
+        cursor.execute("""
+            SELECT id, level, message, component, traceback, timestamp
+            FROM system_logs
+            ORDER BY timestamp DESC
+            LIMIT ?
+        """, (limit,))
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+# ============================================================================
+# USAGE TRACKING & LIMITS
+# ============================================================================
+
+def get_user_usage(user_id: int, month_year: str = None) -> Optional[Dict]:
+    """Get user usage statistics."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    if month_year:
+        cursor.execute("""
+            SELECT * FROM usage_tracking
+            WHERE user_id = ? AND month_year = ?
+        """, (user_id, month_year))
+    else:
+        cursor.execute("""
+            SELECT * FROM usage_tracking
+            WHERE user_id = ?
+            ORDER BY month_year DESC
+            LIMIT 1
+        """, (user_id,))
+
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_usage(user_id: int, scans: int = 0, analyses: int = 0, api_calls: int = 0, 
+                bandwidth_mb: float = 0) -> bool:
+    """Update user usage statistics."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE usage_tracking
+        SET scans_count = scans_count + ?,
+            analyses_count = analyses_count + ?,
+            api_calls = api_calls + ?,
+            bandwidth_mb = bandwidth_mb + ?
+        WHERE user_id = ?
+    """, (scans, analyses, api_calls, bandwidth_mb, user_id))
+
+    conn.commit()
+    conn.close()
+    return True
+
+
+def get_user_limits(user_id: int) -> Optional[Dict]:
+    """Get usage limits for a user."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM usage_limits WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def set_user_limits(user_id: int, max_concurrent: int = 5, max_monthly: int = 100,
+                   max_api_calls: int = 100, bandwidth_limit: int = 5000) -> bool:
+    """Set usage limits for a user."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT OR REPLACE INTO usage_limits
+        (user_id, max_concurrent_scans, max_monthly_scans, max_api_calls_per_hour, bandwidth_limit_mb)
+        VALUES (?, ?, ?, ?, ?)
+    """, (user_id, max_concurrent, max_monthly, max_api_calls, bandwidth_limit))
+
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ============================================================================
+# DEPARTMENTS & TEAMS
+# ============================================================================
+
+def create_department(name: str, description: str = "") -> int:
+    """Create a new department."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            INSERT INTO departments (name, description)
+            VALUES (?, ?)
+        """, (name, description))
+        conn.commit()
+        dept_id = cursor.lastrowid
+        conn.close()
+        return dept_id
+    except sqlite3.IntegrityError:
+        conn.close()
+        return -1
+
+
+def get_all_departments() -> List[Dict]:
+    """Get all departments."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM departments ORDER BY name")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def add_user_to_department(user_id: int, department_id: int, role: str = "") -> bool:
+    """Add user to department."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO team_members (user_id, department_id, role)
+        VALUES (?, ?, ?)
+    """, (user_id, department_id, role))
+
+    conn.commit()
+    conn.close()
+    return True
+
+
+def get_department_members(department_id: int) -> List[Dict]:
+    """Get members of a department."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT tm.id, tm.user_id, tm.role, tm.joined_at, u.username, u.email
+        FROM team_members tm
+        JOIN users u ON tm.user_id = u.id
+        WHERE tm.department_id = ?
+        ORDER BY tm.joined_at DESC
+    """, (department_id,))
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+# ============================================================================
+# BACKUP MANAGEMENT
+# ============================================================================
+
+def create_backup_record(backup_file: str, size_mb: float, backup_type: str = "full") -> int:
+    """Create backup record."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO backup_records (backup_file, size_mb, backup_type)
+        VALUES (?, ?, ?)
+    """, (backup_file, size_mb, backup_type))
+
+    conn.commit()
+    backup_id = cursor.lastrowid
+    conn.close()
+    return backup_id
+
+
+def get_backup_records(limit: int = 50) -> List[Dict]:
+    """Get backup records."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT * FROM backup_records
+        ORDER BY created_at DESC
+        LIMIT ?
+    """, (limit,))
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+# ============================================================================
+# SECURITY ALERTS
+# ============================================================================
+
+def create_security_alert(alert_type: str, user_id: int, channel: str, 
+                         contact_info: str, severity_threshold: str = "HIGH") -> int:
+    """Create security alert configuration."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO security_alerts (alert_type, user_id, channel, contact_info, severity_threshold)
+        VALUES (?, ?, ?, ?, ?)
+    """, (alert_type, user_id, channel, contact_info, severity_threshold))
+
+    conn.commit()
+    alert_id = cursor.lastrowid
+    conn.close()
+    return alert_id
+
+
+def get_user_alerts(user_id: int) -> List[Dict]:
+    """Get security alerts for user."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT * FROM security_alerts
+        WHERE user_id = ? AND enabled = 1
+        ORDER BY created_at DESC
+    """, (user_id,))
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
 
 
 def get_settings() -> Dict:

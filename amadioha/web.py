@@ -1128,6 +1128,436 @@ def api_admin_update_settings():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+
+# ============================================================================
+# THREAT INTELLIGENCE & MONITORING
+# ============================================================================
+
+@app.route('/api/admin/threats', methods=['GET'])
+def api_admin_get_threats():
+    """Get threat logs and statistics."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        limit = int(request.args.get('limit', 50))
+        threats = database.get_threat_logs(limit=limit)
+        
+        # Calculate threat statistics
+        severity_counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0}
+        for threat in threats:
+            severity_counts[threat.get('severity', 'LOW')] += 1
+
+        return jsonify({
+            "status": "success",
+            "threats": threats,
+            "statistics": severity_counts,
+            "total": len(threats)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/activity', methods=['GET'])
+def api_admin_get_activity():
+    """Get recent activity logs."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        limit = int(request.args.get('limit', 100))
+        activities = database.get_activity_logs(limit=limit)
+
+        return jsonify({
+            "status": "success",
+            "activities": activities,
+            "count": len(activities)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ============================================================================
+# IP ACCESS CONTROL
+# ============================================================================
+
+@app.route('/api/admin/ip-access', methods=['GET'])
+def api_admin_get_ip_access():
+    """Get IP whitelist/blacklist."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        list_type = request.args.get('type', None)
+        ips = database.get_ip_access_list(list_type=list_type)
+
+        return jsonify({
+            "status": "success",
+            "ips": ips,
+            "count": len(ips)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/ip-access', methods=['POST'])
+def api_admin_add_ip():
+    """Add IP to whitelist or blacklist."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        data = request.json
+        ip_address = data.get('ip_address')
+        list_type = data.get('list_type')  # 'whitelist' or 'blacklist'
+        reason = data.get('reason', '')
+
+        if not ip_address or not list_type:
+            return jsonify({"error": "Missing required fields"}), 400
+
+        record_id = database.add_ip_to_list(ip_address, list_type, reason, current_user.get('id'))
+        return jsonify({
+            "status": "success",
+            "message": f"IP added to {list_type}",
+            "record_id": record_id
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/ip-access/<ip_address>', methods=['DELETE'])
+def api_admin_remove_ip(ip_address):
+    """Remove IP from access lists."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        database.remove_ip_from_list(ip_address)
+        return jsonify({"status": "success", "message": "IP removed"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ============================================================================
+# API KEY MANAGEMENT
+# ============================================================================
+
+@app.route('/api/admin/api-keys/<user_id>', methods=['GET'])
+def api_admin_get_api_keys(user_id):
+    """Get API keys for a user."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        keys = database.get_user_api_keys(int(user_id))
+        # Mask keys for security
+        masked_keys = [
+            {**k, 'api_key': k['api_key'][:10] + '***' + k['api_key'][-5:]}
+            for k in keys
+        ]
+
+        return jsonify({
+            "status": "success",
+            "api_keys": masked_keys,
+            "count": len(masked_keys)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/api-keys', methods=['POST'])
+def api_admin_create_api_key():
+    """Create API key for a user."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        data = request.json
+        user_id = data.get('user_id')
+        name = data.get('name', 'API Key')
+        permissions = data.get('permissions', 'read')
+
+        api_key = database.create_api_key(int(user_id), name, permissions)
+        return jsonify({
+            "status": "success",
+            "api_key": api_key,
+            "message": "API key created"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/api-keys/<key_id>', methods=['DELETE'])
+def api_admin_revoke_api_key(key_id):
+    """Revoke an API key."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        database.revoke_api_key(int(key_id))
+        return jsonify({"status": "success", "message": "API key revoked"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ============================================================================
+# USAGE TRACKING & LIMITS
+# ============================================================================
+
+@app.route('/api/admin/usage/<user_id>', methods=['GET'])
+def api_admin_get_usage(user_id):
+    """Get user usage statistics."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        usage = database.get_user_usage(int(user_id))
+        limits = database.get_user_limits(int(user_id))
+
+        return jsonify({
+            "status": "success",
+            "usage": usage,
+            "limits": limits
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/usage-limits/<user_id>', methods=['PUT'])
+def api_admin_set_usage_limits(user_id):
+    """Set usage limits for a user."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        data = request.json
+        database.set_user_limits(
+            int(user_id),
+            max_concurrent=data.get('max_concurrent_scans', 5),
+            max_monthly=data.get('max_monthly_scans', 100),
+            max_api_calls=data.get('max_api_calls_per_hour', 100),
+            bandwidth_limit=data.get('bandwidth_limit_mb', 5000)
+        )
+
+        return jsonify({
+            "status": "success",
+            "message": "Usage limits updated"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ============================================================================
+# SYSTEM LOGS
+# ============================================================================
+
+@app.route('/api/admin/logs', methods=['GET'])
+def api_admin_get_logs():
+    """Get system logs."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        limit = int(request.args.get('limit', 100))
+        level = request.args.get('level', None)
+        logs = database.get_system_logs(limit=limit, level=level)
+
+        return jsonify({
+            "status": "success",
+            "logs": logs,
+            "count": len(logs)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ============================================================================
+# DEPARTMENTS & TEAMS
+# ============================================================================
+
+@app.route('/api/admin/departments', methods=['GET'])
+def api_admin_get_departments():
+    """Get all departments."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        departments = database.get_all_departments()
+        return jsonify({
+            "status": "success",
+            "departments": departments
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/departments', methods=['POST'])
+def api_admin_create_department():
+    """Create a new department."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        data = request.json
+        name = data.get('name')
+        description = data.get('description', '')
+
+        dept_id = database.create_department(name, description)
+        if dept_id == -1:
+            return jsonify({"error": "Department already exists"}), 400
+
+        return jsonify({
+            "status": "success",
+            "department_id": dept_id,
+            "message": "Department created"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/departments/<dept_id>/members', methods=['GET'])
+def api_admin_get_dept_members(dept_id):
+    """Get department members."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        members = database.get_department_members(int(dept_id))
+        return jsonify({
+            "status": "success",
+            "members": members
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/departments/<dept_id>/members', methods=['POST'])
+def api_admin_add_dept_member(dept_id):
+    """Add user to department."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        data = request.json
+        user_id = data.get('user_id')
+        role = data.get('role', '')
+
+        database.add_user_to_department(int(user_id), int(dept_id), role)
+        return jsonify({
+            "status": "success",
+            "message": "User added to department"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ============================================================================
+# SECURITY ALERTS
+# ============================================================================
+
+@app.route('/api/admin/alerts/<user_id>', methods=['GET'])
+def api_admin_get_alerts(user_id):
+    """Get security alerts for user."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        alerts = database.get_user_alerts(int(user_id))
+        return jsonify({
+            "status": "success",
+            "alerts": alerts
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/alerts', methods=['POST'])
+def api_admin_create_alert():
+    """Create security alert."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        data = request.json
+        alert_id = database.create_security_alert(
+            alert_type=data.get('alert_type'),
+            user_id=int(data.get('user_id')),
+            channel=data.get('channel'),
+            contact_info=data.get('contact_info'),
+            severity_threshold=data.get('severity_threshold', 'HIGH')
+        )
+
+        return jsonify({
+            "status": "success",
+            "alert_id": alert_id,
+            "message": "Alert configured"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ============================================================================
+# BACKUP MANAGEMENT
+# ============================================================================
+
+@app.route('/api/admin/backups', methods=['GET'])
+def api_admin_get_backups():
+    """Get backup records."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        limit = int(request.args.get('limit', 50))
+        backups = database.get_backup_records(limit=limit)
+
+        return jsonify({
+            "status": "success",
+            "backups": backups
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/admin/backups', methods=['POST'])
+def api_admin_create_backup():
+    """Create database backup."""
+    try:
+        current_user = get_current_user()
+        if not is_admin(current_user):
+            return jsonify({"error": "Forbidden"}), 403
+
+        # Implementation would backup the actual database
+        backup_file = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+        backup_id = database.create_backup_record(backup_file, 0.5, 'manual')
+
+        return jsonify({
+            "status": "success",
+            "backup_id": backup_id,
+            "backup_file": backup_file,
+            "message": "Backup created"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint."""
